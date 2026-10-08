@@ -47,10 +47,11 @@ function checkInvariants(data: BudgetData, plan: SmartPlan) {
     expect(l.why.length).toBeGreaterThan(10);
     expect(l.why).not.toMatch(/\b(APR|allocation|amortization|zero-based)\b/i);
   }
-  expect(plan.hasSuggestions).toBe(plan.changes.length > 0);
-  for (const c of plan.changes) {
-    expect(c.kind === 'newGoal' || c.kind === 'newSpending' || Math.abs(c.to - c.from) >= PLAN_CONFIG.MIN_CHANGE).toBe(true);
-  }
+  // Every line that moves is listed; the Home nudge only fires for $5+ moves or new items.
+  const isNew = (c: SmartPlan['changes'][number]) => c.kind === 'newGoal' || c.kind === 'newSpending';
+  for (const c of plan.changes) expect(isNew(c) || c.to !== c.from).toBe(true);
+  for (const l of plan.lines) if (!plan.changes.includes(l)) expect(l.to).toBe(l.from);
+  expect(plan.hasSuggestions).toBe(plan.changes.some((c) => isNew(c) || Math.abs(c.to - c.from) >= PLAN_CONFIG.MIN_CHANGE));
   const before = JSON.stringify(data);
   const applied = applySmartPlan(data, plan);
   expect(JSON.stringify(data)).toBe(before); // never mutates
@@ -649,7 +650,7 @@ describe('over budget but feasible', () => {
 });
 
 describe('changes threshold', () => {
-  it('only lists moves of at least $5 (plus new items)', () => {
+  it('lists every change, but only nudges about moves of at least $5 (plus new items)', () => {
     const base = budget({
       incomes: [pay(400_000)],
       bills: [bill({ amount: 100_000 })],
@@ -663,8 +664,12 @@ describe('changes threshold', () => {
     const off4 = { ...base, spending: [{ ...base.spending[0], monthly: 39_600 }] };
     const off5 = { ...base, spending: [{ ...base.spending[0], monthly: 39_500 }] };
     // weights change but there is only one fun category, so it still gets all $400
-    expect(buildSmartPlan(off4, today).changes.some((c) => c.id === 'fun')).toBe(false);
-    expect(buildSmartPlan(off5, today).changes.some((c) => c.id === 'fun')).toBe(true);
+    const p4 = buildSmartPlan(off4, today);
+    expect(p4.changes.some((c) => c.id === 'fun')).toBe(true);
+    expect(p4.hasSuggestions).toBe(false);
+    const p5 = buildSmartPlan(off5, today);
+    expect(p5.changes.some((c) => c.id === 'fun')).toBe(true);
+    expect(p5.hasSuggestions).toBe(true);
   });
 });
 

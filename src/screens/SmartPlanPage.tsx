@@ -296,8 +296,8 @@ function Infeasible({ plan, onIncome, onBills }: { plan: SmartPlan; onIncome: ()
             Biggest things to look at
           </h2>
           <ul className="list plan-lines">
-            {plan.levers.map((lv) => (
-              <li key={lv.name} className="plan-line">
+            {plan.levers.map((lv, i) => (
+              <li key={`${i}-${lv.name}`} className="plan-line">
                 <div className="plan-line__top">
                   <span className="row__icon" aria-hidden="true">
                     {lv.emoji}

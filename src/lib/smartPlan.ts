@@ -38,7 +38,7 @@ export interface SmartPlan {
   levers: PlanLever[];
   /** Every adjustable line (fun spending, goals, extra debt, new items) with its suggested amount. */
   lines: PlanLine[];
-  /** Lines that change by >= PLAN_CONFIG.MIN_CHANGE, plus any new items. */
+  /** Every line whose amount changes (even by cents), plus any new items. applySmartPlan applies exactly these. */
   changes: PlanLine[];
   /** Emergency fund the plan wants to create (no existing isEmergencyFund goal), else null. */
   newGoal: Goal | null;
@@ -55,7 +55,7 @@ export interface SmartPlan {
     interestAfter: Cents;
     goals: { id: string; name: string; emoji: string; before: MonthKey | null; after: MonthKey | null }[];
   };
-  /** True when feasible and changes.length > 0. Drives the Home card wording. */
+  /** True when feasible and some change moves by >= PLAN_CONFIG.MIN_CHANGE (or adds an item). Drives the Home card. */
   hasSuggestions: boolean;
 }
 
@@ -463,9 +463,10 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
 
   const allocated = lines.reduce((s, l) => s + l.to, 0);
   const leftOverAfter = income - fixed - allocated;
-  const changes = lines.filter(
-    (l) => l.kind === 'newGoal' || l.kind === 'newSpending' || Math.abs(l.to - l.from) >= C.MIN_CHANGE,
-  );
+  const isNew = (l: PlanLine) => l.kind === 'newGoal' || l.kind === 'newSpending';
+  // Every real change is listed (so nothing changes silently); only $5+ moves are worth nudging about on Home.
+  const changes = lines.filter((l) => isNew(l) || l.to !== l.from);
+  const worthMentioning = changes.some((l) => isNew(l) || Math.abs(l.to - l.from) >= C.MIN_CHANGE);
   const after = activeDebts.length > 0 ? simulatePayoff(data.debts, { method, extra, startMonth }) : before;
 
   return {
@@ -493,7 +494,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
         after: projectGoal({ ...goal, monthly: line.to }, today).reachMonth,
       })),
     },
-    hasSuggestions: changes.length > 0,
+    hasSuggestions: worthMentioning,
   };
 }
 

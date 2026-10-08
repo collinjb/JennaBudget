@@ -86,7 +86,8 @@ export interface MoneyFieldOptions {
  * `validate()` returns cents, or null after showing an inline error.
  */
 export function useMoneyField(initial: Cents | null | undefined, opts: MoneyFieldOptions = {}) {
-  const [value, setValue] = useState(() => (initial == null ? '' : centsToInput(initial)));
+  // New items start empty (null); an existing $0 shows "0" so saving an untouched field still validates.
+  const [value, setValue] = useState(() => (initial == null ? '' : initial === 0 ? '0' : centsToInput(initial)));
   const [error, setError] = useState<string | null>(null);
 
   const check = (v: string) => checkMoney(v, opts);
