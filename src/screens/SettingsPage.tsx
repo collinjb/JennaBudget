@@ -75,6 +75,8 @@ export function SettingsPage() {
     });
     if (!ok) return;
     actions.replaceAll({ ...emptyBudget(), settings: { ...DEFAULT_SETTINGS, theme: s.theme } });
+    toast.show({ message: 'Example cleared. Start by adding your paycheck.' });
+    nav.back();
   };
 
   const startOver = async () => {
@@ -93,6 +95,8 @@ export function SettingsPage() {
     });
     if (!second) return;
     actions.reset();
+    toast.show({ message: 'Everything was erased. Start by adding your paycheck.' });
+    nav.back();
   };
 
   return (

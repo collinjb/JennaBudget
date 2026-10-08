@@ -239,14 +239,14 @@ Theme (System / Light / Dark), "How to install on your iPhone" (Safari → Share
 this phone; home-screen app and Safari keep separate data; back up regularly), About (app version), Start over (double
 confirmation: confirm dialog + type "ERASE" or second confirm).
 
-### Onboarding (first launch: `!settings.onboarded`)
-Welcome → 4 steps (progress dots, Skip always visible, Back):
-1. "How much do you take home, and how often?" — amount, frequency, next payday.
-2. "What bills do you pay every month?" — chips (BILL_PRESETS) add a row with amount + due day; "Something else" adds a
-   blank row.
-3. "Do you have any debt?" — chips (DEBT_PRESETS) add a row with balance, rate, minimum; "No debt 🎉" moves on.
-4. "What do you want money for?" — chips (SPENDING_PRESETS + GOAL_PRESETS): spending → monthly amount; goals → target.
-Finish → Home with the big number filled in. Welcome screen also offers "Just let me look around with example numbers".
+### Access code (replaces the old welcome/setup screens, per the owner's request)
+- A new phone or browser shows "Enter your code": 4 dots and an iPhone-style number pad (a keyboard works too). The right
+  code remembers the device (`localStorage['budget.device']` = the configured hash) and opens straight to Home; it's
+  never asked again on that device unless the code is changed. 5 wrong codes → a 30-second wait.
+- The code is set with `npm run set-code` (typed privately in a terminal); only a salted, re-hashed form is stored in
+  `src/access.json`. `npm run set-code -- --off` removes it.
+- No welcome or setup wizard: a new budget opens on Home, whose empty state says "Add your paycheck", then "Next: add
+  your bills". Example numbers and restoring a backup live in Settings.
 
 ---
 

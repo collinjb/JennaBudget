@@ -29,6 +29,18 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
 - Text scales with browser zoom and the layout is checked at 125–200%. iPhone's "Larger Text" setting
   (`-apple-system-body`) isn't wired in yet; that's a future option once the layout is proven at those sizes on a real phone.
 
+## Access code (owner's request)
+- **Once per device, not every launch:** the owner wanted strangers on new devices kept out, without being asked again on
+  their own phone. A device is remembered by storing the code's hash; changing the code asks every device again.
+- **Static site, so no server check:** the code is checked in the browser against a salted hash (SHA-256, re-hashed 1,000
+  times) in `src/access.json`. That keeps casual visitors out but can't stop a determined, technical person (a 4-digit
+  code's hash can be guessed offline, and the check runs on their device). The budget itself never leaves the phone.
+- **Plain-JavaScript SHA-256** so the check also works on the http home-network test copy (Web Crypto needs https).
+- 5 wrong codes → 30-second wait. Typing on a physical keyboard works too.
+- **No welcome/setup screens:** after the code, a new budget opens straight on Home (owner's request). Home's empty states
+  guide the first steps; example data and restoring a backup are in Settings. `settings.onboarded` stays in saved data
+  only so older data and backups load unchanged.
+
 ## Interaction details
 - **Toasts:** 7 s when they offer Undo, 5 s otherwise; up to 3 stack; the timer pauses while a toast is touched or focused.
   An Undo that would replace the whole budget (Smart Plan, example data, restore) closes as soon as anything else

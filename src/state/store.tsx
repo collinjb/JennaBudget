@@ -38,7 +38,7 @@ export interface BudgetActions {
   setBillPaid(id: string, month: MonthKey | null): void;
   /** Add (or with a negative number, take out) money from a goal's saved amount. Clamped to 0..MAX. */
   addToGoal(id: string, cents: Cents): void;
-  /** Erase everything and start over (onboarding shows again). */
+  /** Erase everything and start over with an empty budget. */
   reset(): void;
 }
 

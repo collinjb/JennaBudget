@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "icons": "node scripts/generate-icons.mjs",
-    "qr": "node scripts/generate-qr.mjs"
+    "qr": "node scripts/generate-qr.mjs",
+    "set-code": "node scripts/set-code.mjs"
   },
   "dependencies": {
     "react": "^19.3.0",

@@ -1,3 +1,4 @@
+import { makeExampleBudget } from '../src/lib/exampleData';
 import { readFile } from 'node:fs/promises';
 import {
   budget,
@@ -62,7 +63,7 @@ test.describe('Settings', () => {
     await expect(page.getByTestId('left-over')).toHaveText('$540');
     expect(await stored(page)).toEqual(original);
 
-    // Load again and clear it from Settings → back to onboarding.
+    // Load again and clear it from Settings → back to Home with an empty budget.
     await openSettings(page);
     await page.getByRole('button', { name: 'Load example budget' }).click();
     await dialog(page).getByRole('button', { name: 'Load example' }).click();
@@ -71,18 +72,19 @@ test.describe('Settings', () => {
     await expect(page.getByText("You're looking at example numbers right now.")).toBeVisible();
     await page.getByRole('button', { name: 'Clear example budget' }).click();
     await dialog(page).getByRole('button', { name: 'Clear', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Welcome to Budget' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'October' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add your paycheck' })).toBeVisible();
     const d = await stored(page);
     expect(d.settings.isExample).toBe(false);
     expect([d.incomes, d.bills, d.debts, d.spending, d.goals]).toEqual([[], [], [], [], []]);
   });
 
   test('"Start my own budget" on the example banner clears the example', async ({ page }) => {
-    await openApp(page);
-    await page.getByRole('button', { name: 'Just let me look around with example numbers' }).click();
+    await openApp(page, makeExampleBudget(TODAY));
     await page.getByRole('button', { name: 'Start my own budget' }).click();
     await dialog(page).getByRole('button', { name: 'Start' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Welcome to Budget' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add your paycheck' })).toBeVisible();
+    await expect(page.getByText("You're looking at example numbers")).toBeHidden();
     expect((await stored(page)).incomes).toEqual([]);
   });
 
@@ -184,22 +186,7 @@ test.describe('Settings', () => {
     expect(await stored(page)).toEqual(original);
   });
 
-  test('restore a backup from the welcome screen ("I have a backup file")', async ({ page }) => {
-    await openApp(page);
-    const data = standardBudget();
-    await expect(page.getByRole('button', { name: 'I have a backup file' })).toBeVisible();
-    await page.getByTestId('restore-file-input').setInputFiles({
-      name: 'budget-backup.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify({ app: 'budget', version: 1, exportedAt: '2026-10-01T12:00:00.000Z', data })),
-    });
-    await expect(dialog(page)).toContainText('Restore this backup?');
-    await dialog(page).getByRole('button', { name: 'Restore' }).click();
-    await expect(page.getByTestId('left-over')).toHaveText('$540');
-    expect(await stored(page)).toEqual(data);
-  });
-
-  test('start over needs two confirmations, then shows onboarding', async ({ page }) => {
+  test('start over needs two confirmations, then shows an empty budget', async ({ page }) => {
     await openApp(page, standardBudget());
     await openSettings(page);
     const startOver = page.getByRole('button', { name: 'Start over (erase everything)' });
@@ -216,11 +203,10 @@ test.describe('Settings', () => {
     await startOver.click();
     await dialog(page).getByRole('button', { name: 'Continue' }).click();
     await dialog(page).getByRole('button', { name: 'Erase everything' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Welcome to Budget' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add your paycheck' })).toBeVisible();
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name: 'Welcome to Budget' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add your paycheck' })).toBeVisible();
     const d = await stored(page);
-    expect(d.settings.onboarded).toBe(false);
     expect([d.incomes, d.bills, d.debts, d.spending, d.goals]).toEqual([[], [], [], [], []]);
   });
 

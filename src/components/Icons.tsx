@@ -205,6 +205,16 @@ export function IconClose(p: IconProps) {
   );
 }
 
+/** Backspace key (an arrow-shaped tag with an ×), as on the iPhone number pad. */
+export function IconDelete(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M9 5h10.5A1.5 1.5 0 0 1 21 6.5v11a1.5 1.5 0 0 1-1.5 1.5H9l-6-7 6-7Z" />
+      <path d="m11.5 9.5 5 5M16.5 9.5l-5 5" strokeWidth={2} />
+    </Svg>
+  );
+}
+
 export function IconCheck(p: IconProps) {
   return (
     <Svg {...p}>

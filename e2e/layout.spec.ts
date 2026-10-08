@@ -1,3 +1,4 @@
+import { makeExampleBudget } from '../src/lib/exampleData';
 import type { Page } from '@playwright/test';
 import {
   bill,
@@ -12,6 +13,7 @@ import {
   openSettings,
   spending,
   test,
+  TODAY,
 } from './helpers';
 
 test.describe.configure({ mode: 'parallel' });
@@ -38,9 +40,7 @@ test.describe('Layout: no horizontal scrolling', () => {
   }
 
   test('every screen with the example budget', async ({ page }) => {
-    await openApp(page);
-    await expectNoHorizontalScroll(page, 'Welcome');
-    await page.getByRole('button', { name: 'Just let me look around with example numbers' }).click();
+    await openApp(page, makeExampleBudget(TODAY));
     await expect(page.getByTestId('left-over')).toBeVisible();
     await checkAllScreens(page);
   });
@@ -72,24 +72,10 @@ test.describe('Layout: no horizontal scrolling', () => {
     await expectNoHorizontalScroll(page, 'Smart Plan (infeasible)');
   });
 
-  test('onboarding steps and an open sheet', async ({ page }) => {
+  test('a brand-new budget and an open sheet', async ({ page }) => {
     await openApp(page);
-    await page.getByRole('button', { name: "Let's get started" }).click();
-    await expectNoHorizontalScroll(page, 'Onboarding step 1');
-    await page.getByLabel('Take-home pay (one paycheck)').fill('1450');
-    await page.getByRole('button', { name: 'Next', exact: true }).click();
-    for (const chip of ['Rent', 'Phone', 'Car Insurance', 'Internet']) {
-      await page.getByRole('button', { name: chip, exact: true }).click();
-    }
-    await expectNoHorizontalScroll(page, 'Onboarding step 2');
-    await page.getByRole('button', { name: 'Skip', exact: true }).click();
-    await page.getByRole('button', { name: 'Credit Card', exact: true }).click();
-    await expectNoHorizontalScroll(page, 'Onboarding step 3');
-    await page.getByRole('button', { name: 'Skip', exact: true }).click();
-    await page.getByRole('button', { name: 'Emergency Fund', exact: true }).click();
-    await page.getByRole('button', { name: 'Groceries', exact: true }).click();
-    await expectNoHorizontalScroll(page, 'Onboarding step 4');
-    await page.getByRole('button', { name: 'Skip', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Add your paycheck' })).toBeVisible();
+    await expectNoHorizontalScroll(page, 'Home (new budget)');
 
     await goTab(page, 'Bills');
     await page.getByRole('button', { name: 'Add your first bill' }).click();

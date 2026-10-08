@@ -1,6 +1,6 @@
 import type { DebtType, PayoffMethod, SpendingCategory } from '../types';
 
-// Quick-add chips used by onboarding and the "add" sheets.
+// Quick-add chips used by the "add" sheets.
 
 export interface BillPreset {
   name: string;

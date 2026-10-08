@@ -83,7 +83,9 @@ test.describe('Data persistence', () => {
     await expect(page.getByRole('heading', { level: 1, name: "We couldn't open your budget" })).toBeVisible();
     await page.getByRole('button', { name: 'Start fresh' }).click();
     await page.getByRole('button', { name: 'Yes, erase and start fresh' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Welcome to Budget' })).toBeVisible();
+    // Straight to a new, empty budget (no welcome screen).
+    await expect(page.getByRole('heading', { level: 1, name: 'October' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add your paycheck' })).toBeVisible();
   });
 
   test('saved data with a damaged field shows the recovery screen', async ({ page }) => {

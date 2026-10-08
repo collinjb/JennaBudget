@@ -5,12 +5,19 @@
 // - Service workers are blocked by default (option `serviceWorkers`); the offline spec allows them.
 // - Time is frozen at Thu Oct 8 2026, 10:00 America/Chicago unless a test says otherwise.
 // - Always navigate relatively (`./`) so the suite also runs against the live sub-path URL (BASE_URL).
+import { readFileSync } from 'node:fs';
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
 import type { Bill, BudgetData, Debt, Goal, Income, Settings, SpendingCategory } from '../src/types';
 
 export { expect };
 
 export const STORAGE_KEY = 'budget.data';
+/** localStorage key that marks a device as having entered the access code (see src/lib/access.ts). */
+export const DEVICE_KEY = 'budget.device';
+/** The configured access-code hash (null when no code is set). The code itself is never in the repo. */
+export const ACCESS_HASH: string | null = (
+  JSON.parse(readFileSync(new URL('../src/access.json', import.meta.url), 'utf8')) as { hash: string | null }
+).hash;
 export const TODAY = '2026-10-08';
 /** Thu Oct 8 2026, 10:00 in America/Chicago (CDT, UTC-5). */
 export const NOW = new Date('2026-10-08T15:00:00Z');
@@ -27,11 +34,25 @@ interface Fixtures {
   /** Collected console errors / page errors; asserted empty after each test. */
   consoleErrors: string[];
   consoleGuard: void;
+  /** Option: start as a brand-new device that hasn't entered the access code yet (default: already unlocked). */
+  locked: boolean;
+  deviceAccess: void;
 }
 
 export const test = base.extend<Fixtures>({
   // Still an option (inherits from the base fixture), so a spec can `test.use({ serviceWorkers: 'allow' })`.
   serviceWorkers: 'block',
+  locked: [false, { option: true }],
+  // Every test runs as a device that already entered the access code, unless it asks for `locked: true`.
+  deviceAccess: [
+    async ({ page, locked }, provide) => {
+      if (!locked && ACCESS_HASH) {
+        await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [DEVICE_KEY, ACCESS_HASH] as const);
+      }
+      await provide();
+    },
+    { auto: true },
+  ],
   consoleErrors: async ({ page }, provide) => {
     const errors: string[] = [];
     // E2E_FAIL_ON_WARNINGS=1 also fails on console.warn (stricter audit runs).

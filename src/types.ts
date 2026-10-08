@@ -95,7 +95,7 @@ export interface Settings {
   /** Planned EXTRA monthly debt payment on top of all minimums (part of the budget). */
   extraDebtPayment: Cents;
   theme: ThemeSetting;
-  /** True once onboarding was completed or skipped. */
+  /** Legacy: the old welcome/setup screens are gone; kept so older saved data and backups still load. */
   onboarded: boolean;
   /** True while the example budget is loaded. */
   isExample: boolean;

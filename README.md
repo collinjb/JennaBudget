@@ -17,6 +17,15 @@ Needs iOS 16.4 or newer (any iPhone from the last several years, kept up to date
 
 Tip: on your computer, open `docs/qr.png` and point your iPhone camera at it to open the link.
 
+## The access code
+
+New phones and browsers ask for a 4-digit code once, then go straight to the budget from then on.
+
+- **Change the code:** run `npm run set-code` in this folder, type the new code (it's hidden), then commit
+  `src/access.json` and push. Every device asks for the new code once.
+- **Turn it off:** `npm run set-code -- --off`, then commit and push.
+- The code keeps casual visitors out. It isn't strong security: the budget numbers never leave your phone anyway.
+
 ## Your data (please read)
 
 - **Everything stays on your phone.** No account, no login, nothing is sent anywhere.
