@@ -1,4 +1,5 @@
 import type { Bill, BillFrequency, Cents, Income, IncomeFrequency } from '../types';
+import { roundDiv } from './money';
 
 export type AnyFrequency = IncomeFrequency | BillFrequency;
 
@@ -27,15 +28,28 @@ export const FREQUENCY_SUFFIX: Record<AnyFrequency, string> = {
  * weekly ×52÷12 · biweekly ×26÷12 · semimonthly ×2 · monthly ×1 · quarterly ÷3 · yearly ÷12
  */
 export function toMonthly(amount: Cents, freq: AnyFrequency): Cents {
-  throw new Error('TODO toMonthly');
+  switch (freq) {
+    case 'weekly':
+      return roundDiv(amount * 52, 12);
+    case 'biweekly':
+      return roundDiv(amount * 26, 12);
+    case 'semimonthly':
+      return amount * 2;
+    case 'monthly':
+      return amount;
+    case 'quarterly':
+      return roundDiv(amount, 3);
+    case 'yearly':
+      return roundDiv(amount, 12);
+  }
 }
 /** True when the monthly figure is an estimate (anything but 'monthly' and 'semimonthly'). Show "≈". */
 export function isApproxMonthly(freq: AnyFrequency): boolean {
-  throw new Error('TODO isApproxMonthly');
+  return freq !== 'monthly' && freq !== 'semimonthly';
 }
 export function incomeMonthly(i: Income): Cents {
-  throw new Error('TODO incomeMonthly');
+  return toMonthly(i.amount, i.frequency);
 }
 export function billMonthly(b: Bill): Cents {
-  throw new Error('TODO billMonthly');
+  return toMonthly(b.amount, b.frequency);
 }

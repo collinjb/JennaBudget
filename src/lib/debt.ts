@@ -1,4 +1,6 @@
 import type { Cents, Debt, MonthKey, PayoffMethod } from '../types';
+import { addMonthsToKey } from './dates';
+import { roundDiv } from './money';
 
 export const MAX_PAYOFF_MONTHS = 600;
 
@@ -47,12 +49,22 @@ export interface PayoffResult {
  * Only debts with balance > 0.
  */
 export function payoffOrder(debts: Debt[], method: PayoffMethod): Debt[] {
-  throw new Error('TODO payoffOrder');
+  const active = debts.filter((d) => d.balance > 0);
+  const byName = (a: Debt, b: Debt) => compareText(a.name, b.name) || compareText(a.id, b.id);
+  if (method === 'snowball') {
+    return active.sort((a, b) => a.balance - b.balance || b.rateBps - a.rateBps || byName(a, b));
+  }
+  return active.sort((a, b) => b.rateBps - a.rateBps || a.balance - b.balance || byName(a, b));
+}
+
+function compareText(a: string, b: string): number {
+  return a.localeCompare(b, 'en-US', { sensitivity: 'base' }) || (a < b ? -1 : a > b ? 1 : 0);
 }
 
 /** One month of interest: round-half-up(balance × rateBps / 120000). */
 export function monthlyInterest(balance: Cents, rateBps: number): Cents {
-  throw new Error('TODO monthlyInterest');
+  if (!(balance > 0) || !(rateBps > 0)) return 0;
+  return roundDiv(balance * rateBps, 120_000);
 }
 
 /**
@@ -65,7 +77,85 @@ export function monthlyInterest(balance: Cents, rateBps: number): Cents {
  * Stops when all balances are 0 or after maxMonths.
  */
 export function simulatePayoff(debts: Debt[], opts: PayoffOptions): PayoffResult {
-  throw new Error('TODO simulatePayoff');
+  const maxMonths = Math.max(0, Math.floor(opts.maxMonths ?? MAX_PAYOFF_MONTHS));
+  const order = payoffOrder(debts, opts.method);
+  const extra = Math.max(0, opts.extra);
+  const monthlyBudget = order.reduce((s, d) => s + minimumFor(d, d.balance), 0) + extra;
+
+  const balances = order.map((d) => d.balance);
+  const interestPaid = order.map(() => 0);
+  const paidOffAt: (number | null)[] = order.map(() => null);
+  let total = balances.reduce((s, b) => s + b, 0);
+  const timeline: Cents[] = [total];
+  let totalInterest = 0;
+  let totalPaid = 0;
+  let months: number | null = order.length === 0 ? 0 : null;
+
+  for (let month = 1; month <= maxMonths && months === null; month++) {
+    // 1) Interest on every debt that still has a balance.
+    for (let i = 0; i < order.length; i++) {
+      if (balances[i] <= 0) continue;
+      const interest = monthlyInterest(balances[i], order[i].rateBps);
+      balances[i] += interest;
+      interestPaid[i] += interest;
+      totalInterest += interest;
+    }
+    // 2) The same amount goes to debt every month.
+    let pool = monthlyBudget;
+    // 3) Minimums (never more than what's owed, never more than what's in the pool).
+    for (let i = 0; i < order.length && pool > 0; i++) {
+      if (balances[i] <= 0) continue;
+      const pay = Math.min(minimumFor(order[i], balances[i]), pool);
+      balances[i] -= pay;
+      pool -= pay;
+      totalPaid += pay;
+    }
+    // 4) Whatever is left goes to debts in payoff order, cascading to the next one.
+    for (let i = 0; i < order.length && pool > 0; i++) {
+      if (balances[i] <= 0) continue;
+      const pay = Math.min(balances[i], pool);
+      balances[i] -= pay;
+      pool -= pay;
+      totalPaid += pay;
+    }
+    total = 0;
+    for (let i = 0; i < order.length; i++) {
+      if (balances[i] <= 0 && paidOffAt[i] === null) paidOffAt[i] = month;
+      total += balances[i];
+    }
+    timeline.push(total);
+    if (total <= 0) months = month;
+  }
+
+  const perDebt: DebtPayoffInfo[] = order.map((d, i) => ({
+    id: d.id,
+    name: d.name,
+    order: i + 1,
+    months: paidOffAt[i],
+    payoffMonth: paidOffAt[i] === null ? null : addMonthsToKey(opts.startMonth, paidOffAt[i] as number),
+    interestPaid: interestPaid[i],
+  }));
+  perDebt.sort((a, b) => {
+    if (a.months === null && b.months === null) return a.order - b.order;
+    if (a.months === null) return 1;
+    if (b.months === null) return -1;
+    return a.months - b.months || a.order - b.order;
+  });
+
+  return {
+    months,
+    debtFreeMonth: months === null ? null : addMonthsToKey(opts.startMonth, months),
+    totalInterest,
+    totalPaid,
+    perDebt,
+    timeline,
+    monthlyBudget,
+  };
+}
+
+/** The minimum payment that applies to a balance: min(minPayment, balance), never negative. */
+function minimumFor(d: Debt, balance: Cents): Cents {
+  return Math.max(0, Math.min(d.minPayment, balance));
 }
 
 export interface InterestWarning {
@@ -77,7 +167,15 @@ export interface InterestWarning {
 
 /** Debts (balance > 0, rate > 0) whose minPayment <= their first month of interest: they'd never shrink on their own. */
 export function interestWarnings(debts: Debt[]): InterestWarning[] {
-  throw new Error('TODO interestWarnings');
+  const out: InterestWarning[] = [];
+  for (const d of debts) {
+    if (!(d.balance > 0) || !(d.rateBps > 0)) continue;
+    const interest = monthlyInterest(d.balance, d.rateBps);
+    if (d.minPayment <= interest) {
+      out.push({ debtId: d.id, name: d.name, monthlyInterest: interest, minPayment: d.minPayment });
+    }
+  }
+  return out;
 }
 
 export interface ExtraComparison {
@@ -96,5 +194,13 @@ export function compareExtra(
   newExtra: Cents,
   startMonth: MonthKey,
 ): ExtraComparison {
-  throw new Error('TODO compareExtra');
+  const base = simulatePayoff(debts, { method, extra: baseExtra, startMonth });
+  const withExtra = simulatePayoff(debts, { method, extra: newExtra, startMonth });
+  const monthsSooner = base.months !== null && withExtra.months !== null ? base.months - withExtra.months : null;
+  return {
+    base,
+    withExtra,
+    monthsSooner,
+    interestSaved: Math.max(0, base.totalInterest - withExtra.totalInterest),
+  };
 }

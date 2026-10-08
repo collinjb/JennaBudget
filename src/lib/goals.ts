@@ -1,4 +1,6 @@
 import type { Cents, Goal, ISODate, MonthKey } from '../types';
+import { addMonthsToKey, monthKey, monthsBetween } from './dates';
+import { ceilDiv } from './money';
 
 export type GoalStatus =
   | 'reached' //         saved >= target
@@ -24,5 +26,31 @@ export interface GoalProjection {
 }
 
 export function projectGoal(goal: Goal, today: ISODate): GoalProjection {
-  throw new Error('TODO projectGoal');
+  const currentMonth = monthKey(today);
+  const target = Math.max(0, goal.target);
+  const saved = Math.max(0, goal.saved);
+  const monthly = Math.max(0, goal.monthly);
+  const remaining = Math.max(0, target - saved);
+  const reached = saved >= target;
+  const percent = target <= 0 ? 100 : Math.min(100, Math.max(0, Math.floor((saved * 100) / target)));
+  const monthsLeft = goal.targetDate ? monthsBetween(currentMonth, monthKey(goal.targetDate)) : null;
+
+  let monthsToGoal: number | null = null;
+  if (reached) monthsToGoal = 0;
+  else if (monthly > 0) monthsToGoal = ceilDiv(remaining, monthly);
+  const reachMonth = monthsToGoal === null ? null : addMonthsToKey(currentMonth, monthsToGoal);
+
+  let neededPerMonth: Cents | null = null;
+  let status: GoalStatus;
+  if (monthsLeft !== null) {
+    if (monthsLeft > 0) neededPerMonth = ceilDiv(remaining, monthsLeft);
+    else if (!reached) neededPerMonth = remaining;
+  }
+  if (reached) status = 'reached';
+  else if (monthsLeft !== null) {
+    if (monthsLeft <= 0) status = 'past-due';
+    else status = monthly >= (neededPerMonth ?? 0) ? 'on-track' : 'behind';
+  } else status = monthly > 0 ? 'no-deadline' : 'no-contribution';
+
+  return { remaining, percent, monthsToGoal, reachMonth, monthsLeft, neededPerMonth, status };
 }
