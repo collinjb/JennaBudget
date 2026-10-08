@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Chip, ChipRow } from '../components/Chip';
 import { announce } from '../components/announce';
-import { DateInput, DayPairField, DayPicker, isUsableDate, semimonthlyDaysError } from '../components/DateInput';
+import { DateInput, DayPairField, DayPicker, isUsableDate } from '../components/DateInput';
+import { semimonthlyDaysError } from '../lib/schedule';
 import { TextField, cleanName } from '../components/Field';
 import { IconChevronLeft, IconClose } from '../components/Icons';
 import { MoneyInput, checkMoney } from '../components/MoneyInput';

@@ -18,6 +18,8 @@ export interface Removed<K extends CollectionName> {
   collection: K;
   item: CollectionItem<K>;
   index: number;
+  /** Planned extra debt payment that was dropped because this was the last debt; Undo puts it back. */
+  extraDebtPayment?: Cents;
 }
 
 export interface BudgetActions {
@@ -45,6 +47,8 @@ interface StoreValue {
   corruptRaw: string | null;
   /** Why the saved data couldn't be read (status 'corrupt'), e.g. it was saved by a newer version. */
   corruptError: string | null;
+  /** 'newer-version' when the saved data came from a newer app (update instead of recovering); else 'damaged'. */
+  corruptReason: 'damaged' | 'newer-version' | null;
   /** Last save error (e.g. storage full / private mode), or null. */
   saveError: string | null;
   actions: BudgetActions;
@@ -57,15 +61,23 @@ interface InitialState {
   status: StoreStatus;
   corruptRaw: string | null;
   corruptError: string | null;
+  corruptReason: 'damaged' | 'newer-version' | null;
 }
 
 function initialState(): InitialState {
   const result = loadData();
-  if (result.status === 'ok') return { data: result.data, status: 'ready', corruptRaw: null, corruptError: null };
+  const fine = { corruptRaw: null, corruptError: null, corruptReason: null };
+  if (result.status === 'ok') return { data: result.data, status: 'ready', ...fine };
   if (result.status === 'corrupt') {
-    return { data: emptyBudget(), status: 'corrupt', corruptRaw: result.raw, corruptError: result.error };
+    return {
+      data: emptyBudget(),
+      status: 'corrupt',
+      corruptRaw: result.raw,
+      corruptError: result.error,
+      corruptReason: result.reason,
+    };
   }
-  return { data: emptyBudget(), status: 'ready', corruptRaw: null, corruptError: null };
+  return { data: emptyBudget(), status: 'ready', ...fine };
 }
 
 /** Once every debt is paid off, a planned extra payment no longer means anything; drop it so it can't come back
@@ -125,8 +137,11 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         const index = list.findIndex((x) => x.id === id);
         if (index === -1) return null;
         const item = list[index];
+        const extraBefore = dataRef.current.settings.extraDebtPayment;
         update((d) => ({ ...d, [collection]: (d[collection] as { id: string }[]).filter((x) => x.id !== id) }));
-        return { collection, item, index };
+        // Deleting the last debt drops the planned extra payment; remember it so Undo can put it back.
+        const dropped = extraBefore > 0 && dataRef.current.settings.extraDebtPayment === 0;
+        return dropped ? { collection, item, index, extraDebtPayment: extraBefore } : { collection, item, index };
       },
       restore(removed) {
         update((d) => {
@@ -142,7 +157,11 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
           }
           const next = [...list];
           next.splice(Math.min(removed.index, next.length), 0, item);
-          return { ...d, [removed.collection]: next };
+          const settings =
+            removed.extraDebtPayment !== undefined && d.settings.extraDebtPayment === 0
+              ? { ...d.settings, extraDebtPayment: removed.extraDebtPayment }
+              : d.settings;
+          return { ...d, [removed.collection]: next, settings };
         });
       },
       updateSettings(patch) {
@@ -173,8 +192,16 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<StoreValue>(
-    () => ({ data, status, corruptRaw: init.corruptRaw, corruptError: init.corruptError, saveError, actions }),
-    [data, status, init.corruptRaw, init.corruptError, saveError, actions],
+    () => ({
+      data,
+      status,
+      corruptRaw: init.corruptRaw,
+      corruptError: init.corruptError,
+      corruptReason: init.corruptReason,
+      saveError,
+      actions,
+    }),
+    [data, status, init.corruptRaw, init.corruptError, init.corruptReason, saveError, actions],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

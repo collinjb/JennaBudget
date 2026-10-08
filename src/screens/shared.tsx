@@ -28,7 +28,7 @@ export function q(name: string): string {
 }
 
 /**
- * Delete flow used everywhere: confirm → remove → "Deleted" toast with Undo (~5 s).
+ * Delete flow used everywhere: confirm → remove → "Deleted" toast with Undo (7 s, paused while touched).
  * Resolves true when the item was deleted.
  */
 export function useDeleteWithUndo() {

@@ -104,6 +104,10 @@ test.describe('Onboarding', () => {
     await page.getByLabel('Second payday').selectOption('1');
     await next(page);
     await expect(page.getByText('Please pick two different days.')).toBeVisible();
+    await page.getByLabel('Second payday').selectOption('3');
+    await next(page);
+    await expect(page.getByText('Please pick days at least a week apart.')).toBeVisible();
+    await page.getByLabel('First payday').selectOption('15');
     await page.getByLabel('Second payday').selectOption('31');
     await next(page);
     await stepIs(page, 2);
@@ -114,7 +118,7 @@ test.describe('Onboarding', () => {
     await page.getByRole('button', { name: 'Finish' }).click();
     await expect(page.getByTestId('left-over')).toHaveText('$2,000');
     const d = await stored(page);
-    expect(d.incomes[0]).toEqual(expect.objectContaining({ frequency: 'semimonthly', semimonthlyDays: [1, 31] }));
+    expect(d.incomes[0]).toEqual(expect.objectContaining({ frequency: 'semimonthly', semimonthlyDays: [15, 31] }));
     expect(d.debts).toEqual([]);
   });
 

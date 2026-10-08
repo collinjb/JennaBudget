@@ -46,7 +46,7 @@ function countsOf(d: BudgetData): Omit<BackupSummary, 'exportedAt'> {
  * Nothing is overwritten until the user picks one of the options.
  */
 export function RecoveryScreen() {
-  const { corruptRaw, corruptError, actions } = useBudget();
+  const { corruptRaw, corruptError, corruptReason, actions } = useBudget();
   const [previous] = useState(() => loadPreviousData());
   const [picked, setPicked] = useState<{ data: BudgetData; summary: BackupSummary } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function RecoveryScreen() {
   const fileInput = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
   // Data saved by a newer version of the app isn't damaged: updating the app is the real fix.
-  const newerVersion = !!corruptError && /newer version/i.test(corruptError);
+  const newerVersion = corruptReason === 'newer-version';
 
   // The "Erase everything?" question takes focus when it appears, so it's read right away.
   useEffect(() => {

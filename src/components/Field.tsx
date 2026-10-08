@@ -71,7 +71,7 @@ export function TextField({
   placeholder,
   helper,
   error,
-  maxLength = 40,
+  maxLength = MAX_NAME_CHARS,
   hideLabel,
   inputRef,
   autoCapitalize = 'words',

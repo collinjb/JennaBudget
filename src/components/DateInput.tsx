@@ -100,16 +100,6 @@ export function DayPicker({
   );
 }
 
-/**
- * Problem with a twice-a-month pair of paydays, or null. The same day twice, or days that can land on the same date
- * (29/31 are both the 28th in February) or close together, are rejected.
- */
-export function semimonthlyDaysError(days: readonly [number, number]): string | null {
-  if (days[0] === days[1]) return 'Please pick two different days.';
-  if (Math.abs(days[0] - days[1]) < 7) return 'Please pick days at least a week apart.';
-  return null;
-}
-
 /** The two paydays for "twice a month", with one shared error under both pickers. */
 export function DayPairField({
   days,

@@ -192,4 +192,21 @@ test.describe('Paycheck Plan', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'October' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
   });
+
+  test('browser back over a confirm dialog closes only the dialog', async ({ page }) => {
+    await openApp(page, standardBudget());
+    await page.getByTestId('plan-card').getByRole('button', { name: 'See the Smart Plan' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Smart Plan' })).toBeVisible();
+    const before = await stored(page);
+    await page.getByRole('button', { name: 'Use this plan' }).click();
+    await expect(dialog(page)).toBeVisible();
+    await page.goBack();
+    await expect(dialog(page)).toBeHidden();
+    // Still on the Smart Plan page, and nothing was applied.
+    await expect(page.getByRole('heading', { level: 1, name: 'Smart Plan' })).toBeVisible();
+    expect(await stored(page)).toEqual(before);
+    // A second Back leaves the page as usual.
+    await page.goBack();
+    await expect(page.getByRole('heading', { level: 1, name: 'October' })).toBeVisible();
+  });
 });

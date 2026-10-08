@@ -288,3 +288,19 @@ export function extraPaycheckMonths(
   }
   return out;
 }
+
+/**
+ * Problem with a twice-a-month pair of paydays, or null. Rejects the same day twice, and days that come within a week of
+ * each other in any month, counting across the month boundary (29/31 are both the 28th in February; the 28th and the 1st
+ * are a day apart).
+ */
+export function semimonthlyDaysError(days: readonly [number, number]): string | null {
+  if (days[0] === days[1]) return 'Please pick two different days.';
+  for (const monthLength of [28, 29, 30, 31]) {
+    const a = Math.min(days[0], monthLength);
+    const b = Math.min(days[1], monthLength);
+    const gap = Math.abs(a - b);
+    if (Math.min(gap, monthLength - gap) < 7) return 'Please pick days at least a week apart.';
+  }
+  return null;
+}

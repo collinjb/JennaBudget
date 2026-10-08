@@ -1,6 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { isSilentPop } from './history';
+import { historyState, isSilentPop, silentBackThen } from './history';
+
+/** history.state key marking the entry an open dialog adds, so Back closes just the dialog (not what's under it). */
+const DIALOG_STATE_KEY = 'budgetDialog';
 import { useModalLayer } from './modal';
 
 export interface ConfirmOptions {
@@ -91,11 +94,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const pending = useRef<((v: boolean) => void) | null>(null);
   const counter = useRef(0);
 
-  const finish = useCallback((value: boolean) => {
+  const finish = useCallback((value: boolean, fromHistory = false) => {
     const resolve = pending.current;
     pending.current = null;
     setState(null);
-    resolve?.(value);
+    // Take our history entry back off (unless Back already did), and only answer once that's done, so whatever the
+    // caller does next (e.g. leave the page) starts from the right history entry.
+    if (!fromHistory && historyState()[DIALOG_STATE_KEY] === counter.current) silentBackThen(() => resolve?.(value));
+    else resolve?.(value);
   }, []);
 
   const confirm = useCallback<ConfirmFn>(
@@ -104,6 +110,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
         pending.current?.(false);
         pending.current = resolve;
         counter.current += 1;
+        // One history entry per open dialog: a newer request takes over the entry of one that's still open.
+        const entry = { ...historyState(), [DIALOG_STATE_KEY]: counter.current };
+        if (historyState()[DIALOG_STATE_KEY] !== undefined) window.history.replaceState(entry, '');
+        else window.history.pushState(entry, '');
         setState({ opts, key: counter.current });
       }),
     [],
@@ -114,7 +124,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!open) return;
     const onPop = () => {
-      if (!isSilentPop()) finish(false);
+      if (isSilentPop() || historyState()[DIALOG_STATE_KEY] === counter.current) return;
+      finish(false, true);
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);

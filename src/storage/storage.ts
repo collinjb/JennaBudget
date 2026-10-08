@@ -38,7 +38,7 @@ const MAX_BACKUP_CHARS = 5_000_000;
 export type LoadResult =
   | { status: 'ok'; data: BudgetData; migrated: boolean }
   | { status: 'empty' }
-  | { status: 'corrupt'; raw: string; error: string };
+  | { status: 'corrupt'; raw: string; error: string; reason: 'damaged' | 'newer-version' };
 
 // ---------------------------------------------------------------------------------------------
 // localStorage access (every call can throw: private mode, storage disabled, quota)
@@ -86,11 +86,16 @@ export function loadData(): LoadResult {
   if (raw === null) return { status: 'empty' };
   const parsed = parseJson(raw);
   if (!parsed.ok) {
-    return { status: 'corrupt', raw, error: "Your saved budget couldn't be read. It may have been damaged." };
+    return {
+      status: 'corrupt',
+      raw,
+      error: "Your saved budget couldn't be read. It may have been damaged.",
+      reason: 'damaged',
+    };
   }
   const m = migrateInternal(parsed.value);
   const v = validateBudget(m.value);
-  if (!v.ok) return { status: 'corrupt', raw, error: v.error };
+  if (!v.ok) return { status: 'corrupt', raw, error: v.error, reason: isNewerVersion(parsed.value) ? 'newer-version' : 'damaged' };
   lastGoodRaw = raw;
   return { status: 'ok', data: v.data, migrated: m.changed };
 }
@@ -294,6 +299,13 @@ export function migrate(raw: unknown): unknown {
 // Validation
 
 class InvalidData extends Error {}
+
+/** True when the data says it was written by a newer version of the app than this one. */
+function isNewerVersion(raw: unknown): boolean {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const version = (raw as { schemaVersion?: unknown }).schemaVersion;
+  return typeof version === 'number' && version > SCHEMA_VERSION;
+}
 
 const INCOME_FREQUENCIES: readonly IncomeFrequency[] = ['weekly', 'biweekly', 'semimonthly', 'monthly'];
 const BILL_FREQUENCIES: readonly BillFrequency[] = ['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'];
@@ -721,9 +733,10 @@ export async function shareOrDownloadFile(
       await nav.share({ files: [file], title });
       return 'shared';
     } catch (e) {
-      // Only "sharing isn't allowed here" falls back to a download. Closing the sheet (AbortError) is a cancel, and a
-      // share sheet that's already opening (InvalidStateError, e.g. a double tap) must not also start a download.
-      if (!isErrorNamed(e, 'NotAllowedError', 'TypeError')) return 'cancelled';
+      // Closing the share sheet (AbortError) is a cancel, and a share sheet that's already opening
+      // (InvalidStateError, e.g. a double tap) must not also start a download. Any other failure falls back to a
+      // download, so the person always gets their file or a clear result.
+      if (isErrorNamed(e, 'AbortError', 'InvalidStateError')) return 'cancelled';
     }
   }
   return downloadText(filename, text, type) ? 'downloaded' : 'cancelled';

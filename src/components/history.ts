@@ -26,6 +26,24 @@ export function silentBack(): void {
   window.history.back();
 }
 
+/**
+ * silentBack(), then run `then` once the browser has really gone back (or shortly after, if it never does). Use it when
+ * the next step may navigate again: two back() calls in a row can collapse into one.
+ */
+export function silentBackThen(then: () => void): void {
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('popstate', finish);
+    window.clearTimeout(timer);
+    then();
+  };
+  window.addEventListener('popstate', finish);
+  const timer = window.setTimeout(finish, 400);
+  silentBack();
+}
+
 /** True inside popstate listeners when the pop came from silentBack(), not from the person pressing Back. */
 export function isSilentPop(): boolean {
   return silentNow;

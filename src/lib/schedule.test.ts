@@ -7,6 +7,7 @@ import {
   incomePaydays,
   nextPaydays,
   paycheckPlan,
+  semimonthlyDaysError,
 } from './schedule';
 import { bill, budget, debt, income } from './testUtils';
 
@@ -346,5 +347,21 @@ describe('extraPaycheckMonths', () => {
     // Jan 2, 16, 30 and Jul 3, 17, 31 are the 3-payday months; the last 2026 payday is Dec 18.
     expect(total).toBe(26);
     expect(addDays('2026-12-18', 14)).toBe('2027-01-01');
+  });
+});
+
+describe('semimonthlyDaysError', () => {
+  it('accepts common pairs', () => {
+    for (const pair of [[1, 15], [15, 31], [5, 20], [10, 25], [7, 22]] as const) {
+      expect(semimonthlyDaysError(pair)).toBeNull();
+    }
+  });
+  it('rejects the same day', () => {
+    expect(semimonthlyDaysError([15, 15])).toBe('Please pick two different days.');
+  });
+  it('rejects days within a week, including across the month boundary and short months', () => {
+    for (const pair of [[1, 5], [29, 31], [30, 31], [28, 1], [31, 1], [27, 2]] as const) {
+      expect(semimonthlyDaysError(pair)).toBe('Please pick days at least a week apart.');
+    }
   });
 });

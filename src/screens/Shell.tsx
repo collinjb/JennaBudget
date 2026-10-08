@@ -71,7 +71,7 @@ export function Shell() {
   useEffect(() => {
     // A reload while a page or sheet was open: start clean on the tabs.
     const st = historyState();
-    if (pageFromState(st) || 'budgetSheet' in st) window.history.replaceState(null, '');
+    if (pageFromState(st) || 'budgetSheet' in st || 'budgetDialog' in st) window.history.replaceState(null, '');
     const onPop = (e: PopStateEvent) => setPage(pageFromState(e.state));
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);

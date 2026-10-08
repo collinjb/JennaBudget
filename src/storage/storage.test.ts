@@ -225,7 +225,20 @@ describe('load / save', () => {
     store.setItem(STORAGE_KEY, JSON.stringify(bad));
     const res = loadData();
     expect(res.status).toBe('corrupt');
-    if (res.status === 'corrupt') expect(res.error).toBe('Bill 1 ("Rent"): the amount can\'t be negative.');
+    if (res.status === 'corrupt') {
+      expect(res.error).toBe('Bill 1 ("Rent"): the amount can\'t be negative.');
+      expect(res.reason).toBe('damaged');
+    }
+  });
+
+  it('tells data from a newer version apart from damaged data', () => {
+    store.setItem(STORAGE_KEY, JSON.stringify({ ...loose(), schemaVersion: 999 }));
+    const res = loadData();
+    expect(res.status).toBe('corrupt');
+    if (res.status === 'corrupt') expect(res.reason).toBe('newer-version');
+    store.setItem(STORAGE_KEY, '{"incomes": [');
+    const broken = loadData();
+    if (broken.status === 'corrupt') expect(broken.reason).toBe('damaged');
   });
 
   it('treats an empty stored string as corrupt, not as a new budget', () => {

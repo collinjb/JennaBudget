@@ -84,8 +84,12 @@ All in `src/lib`. Integer cents only; round half-up once at the end of each conv
   (sum of minimums + extra) → pay each debt `min(minPayment, balance)` → leftover pool to debts in payoff order
   (avalanche: highest rate first; snowball: smallest balance first), cascading, never overpaying. Freed minimums roll
   over automatically because the pool stays constant. Cap 600 months → `months: null` → UI says "more than 50 years".
-  0% debts work. **Warning** (`interestWarnings`): min payment ≤ first month's interest →
-  "Your $25 payment doesn't cover the $31 of interest each month, so this balance will keep growing."
+  0% debts work. **Warnings** (`interestWarnings`, three kinds):
+  - `grows` (minimum < interest): "Your $25 payment doesn't cover the $31 of interest each month, so this balance will
+    keep growing."
+  - `flat` (minimum = interest): "Your $100 payment only covers the interest, so this balance won't go down."
+  - `no-payment` (balance > 0, minimum $0, any rate incl. 0%): "There's no monthly payment set, so this balance never
+    gets paid down."
 - **Goals** (`projectGoal`): first contribution next month. months to goal = ceil(remaining ÷ monthly); reach month =
   current month + that. With a deadline: monthsLeft = targetMonth − currentMonth; needed/month = ceil(remaining ÷
   monthsLeft) (deadline later this month: needed = everything left); `on-track` if monthly ≥ needed, else `behind`;
@@ -107,7 +111,7 @@ if R < 0 → feasible=false, shortfall=−R, levers = biggest bills + must-have 
            (max 4, desc), lines=[], changes=[], hasSuggestions=false. Impact before = after (current).
 tight = R < income × TIGHT_RATIO
 
-0) Growing debt (minimum ≤ monthly interest). rescue = max(smallest extra that pays those debts off within 600 months,
+0) Growing debt (any `interestWarnings` kind: grows, flat or no-payment). rescue = max(smallest extra that pays those debts off within 600 months,
    min(smallest extra that pays them off within GROWING_DEBT_PAYOFF_MONTHS, floorDollars(R × GROWING_DEBT_MAX_SHARE))),
    never more than floorDollars(R).  R −= rescue.  (Added to the extra-debt line; why = "doesn't cover its interest".)
 A) Safety net. ef = first goal with isEmergencyFund.
@@ -130,6 +134,8 @@ F) Open goals split floorDollars(R) equally (whole dollars, extra dollars to ear
    ceilDollars(remaining); overflow re-split among the rest; any final overflow → extra if active debts exist, else stays.
 leftOverAfter = income − fixed − everything allocated above.
 ```
+
+Every suggested amount is capped at MAX_MONEY_CENTS.
 
 **Lines** (every adjustable item, `from` = current, `to` = suggested): EF (existing or new), each fun category
 (+ newSpending), each goal from D/E/F, and `extraDebt` (only when active debts exist). Reached non-EF goals are not
@@ -164,7 +170,7 @@ Disclaimer footer: "These are general budgeting guidelines, not professional fin
 
 Global: bottom tab bar (Home · Money In · Bills · Savings & Fun · Debt), icons + labels, ≥44pt targets, padded for the
 home indicator. Each screen: large title + one-line explanation. Add/edit via bottom sheets. Delete = confirm → Undo
-toast (~5 s). Empty states: emoji + one sentence + one big button.
+toast (7 s, pauses while touched; up to 3 stack). Empty states: emoji + one sentence + one big button.
 
 Screen explanations:
 - Home: "Here's your month at a glance."
