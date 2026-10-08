@@ -36,10 +36,18 @@
   margin-top: 16px;
 }
 
-.hero__over {
+.hero__label--over {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  color: var(--c-over-ink);
+}
+
+.hero__label--over svg {
+  flex: 0 0 auto;
+}
+
+.hero__over {
   margin-top: 4px;
   color: var(--c-over-ink);
   font-family: var(--font-rounded);
@@ -47,10 +55,6 @@
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.1;
-}
-
-.hero__over svg {
-  flex: 0 0 auto;
 }
 
 .hero__amount {
@@ -199,6 +203,10 @@
   margin-top: 14px;
 }
 
+.next-step .btn {
+  margin-top: 14px;
+}
+
 .plan-card--new {
   background:
     radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--c-fun) 12%, transparent), transparent 60%),
@@ -285,9 +293,7 @@
 .goal-card__name {
   font-size: var(--fs-body);
   font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .goal-card__sub {
@@ -420,9 +426,7 @@
 .debt-card__name {
   font-size: var(--fs-body);
   font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .debt-card__type {
@@ -1043,18 +1047,15 @@
 }
 
 .onb__logo {
-  display: grid;
-  place-items: center;
+  display: block;
+  flex: 0 0 auto;
   width: 104px;
   height: 104px;
   margin-bottom: 24px;
-  border-radius: 28px;
-  background: linear-gradient(145deg, #34d399 0%, #0ea5a4 55%, #2563eb 100%);
-  box-shadow: 0 14px 34px rgba(14, 148, 136, 0.35);
-  color: #fff;
-  font-family: var(--font-rounded);
-  font-size: 3.6rem;
-  font-weight: 800;
+  /* Matches the icon's own rounded corners (~22% like iOS) so the shadow hugs it. */
+  border-radius: 23px;
+  /* Teal-to-blue glow, same colors as the icon. */
+  box-shadow: 0 14px 34px rgba(46, 168, 224, 0.35);
 }
 
 .onb__perks {
@@ -1104,12 +1105,18 @@
 
 .onb-row__name {
   flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
   font-weight: 700;
   font-size: var(--fs-body);
 }
 
-.onb-row__tag {
-  margin-left: 8px;
+/* A long name keeps its tag: the tag drops to the next line instead of being cut off. */
+.onb-row__name > .ellipsis {
+  max-width: 100%;
 }
 
 .onb-row__remove {

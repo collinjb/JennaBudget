@@ -68,6 +68,7 @@ export const PLAN_WHY = {
   safetyNetFull: 'Your safety net is full. Nice work!',
   fun: "Budgets with zero fun don't last. This is guilt-free money to enjoy.",
   funTight: 'Money is tight, so this is smaller, but you still get some fun.',
+  funTrimmed: 'This trims fun money a bit so everything else fits. You still get guilt-free money to enjoy.',
   funNone: "There's no room for fun money right now, but it comes back as soon as there is.",
   deadlineFunded: (target: Cents, month: MonthKey) =>
     `This is what it takes to reach ${formatMoney(target)} by ${formatMonth(month)}.`,
@@ -312,14 +313,16 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
       funCats.map((c) => c.monthly),
     );
     funCats.forEach((c, i) => {
+      const to = split[i] * 100;
       lines.push({
         kind: 'spending',
         id: c.id,
         name: c.name,
         emoji: c.emoji,
         from: c.monthly,
-        to: split[i] * 100,
-        why: funWhy,
+        to,
+        // A cut needs its own explanation; "budgets with zero fun don't last" reads oddly next to a smaller number.
+        why: fun > 0 && !tight && to < c.monthly ? PLAN_WHY.funTrimmed : funWhy,
       });
     });
   } else if (fun > 0) {

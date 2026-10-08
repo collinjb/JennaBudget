@@ -53,6 +53,8 @@ export function HomeScreen() {
   const warnings = useMemo(() => interestWarnings(activeDebts), [activeDebts]);
 
   const hasIncome = data.incomes.length > 0;
+  /** Set up a paycheck but no bills yet: nudge toward bills before anything else. */
+  const needsBills = hasIncome && data.bills.length === 0;
   const over = hb.over;
   const partCents = (k: BreakdownKey) => hb.parts.find((p) => p.key === k)?.cents ?? 0;
 
@@ -99,13 +101,15 @@ export function HomeScreen() {
       <section className={`card hero ${over ? 'hero--over' : 'hero--left'}`} aria-labelledby="hero-label">
         {over ? (
           <>
-            <p className="bignum__label" id="hero-label">
-              Left over this month
+            <p className="bignum__label hero__label--over" id="hero-label">
+              <IconWarning size={20} />
+              <span>Left over this month</span>
             </p>
             <p className="hero__over" aria-live="polite" aria-atomic="true">
-              <IconWarning size={28} />
+              {/* "$1,998 over" never splits across lines; "You're" wraps first on small phones. */}
               <span data-testid="left-over" data-cents={hb.leftOver}>
-                You're <span className="hero__amount">{formatMoney(-hb.leftOver, { showCents: 'never' })}</span> over
+                You're{' '}
+                <span className="hero__amount">{formatMoney(-hb.leftOver, { showCents: 'never' })} over</span>
               </span>
             </p>
             {hasIncome ? (
@@ -153,6 +157,18 @@ export function HomeScreen() {
           </>
         )}
       </section>
+
+      {/* Getting started: a paycheck but no bills yet, so the big number is just the paycheck. */}
+      {needsBills && (
+        <Card className="next-step" title="Next: add your bills">
+          <p className="muted small">
+            Rent, phone, insurance, streaming… Add what you pay, and the number above shows what's really left.
+          </p>
+          <button type="button" className="btn btn--primary btn--block" onClick={() => nav.goTab('bills', 'add')}>
+            Add your bills
+          </button>
+        </Card>
+      )}
 
       {/* 2. Where your money goes */}
       {hasIncome && (
@@ -233,6 +249,7 @@ export function HomeScreen() {
               <span>
                 <strong>{w.name}:</strong> Your {formatMoney(w.minPayment)} payment doesn't cover the{' '}
                 {formatMoney(w.monthlyInterest)} of interest each month, so this balance will keep growing.
+                {payoff.months !== null && ' Your plan still pays it off later, once extra money goes to it.'}
               </span>
             </p>
           ))}
@@ -254,7 +271,11 @@ export function HomeScreen() {
                 <h2 className="card__title">Your bills are more than your income</h2>
               </div>
               <p className="muted small">
-                You're short <Money cents={plan.shortfall} /> a month on must-pays. Let's look at what could help.
+                Even before savings and fun, your bills, minimum debt payments, and must-have spending cost{' '}
+                <strong>
+                  <Money cents={plan.shortfall} showCents="never" /> more
+                </strong>{' '}
+                than you take home each month. Let's look at what could help.
               </p>
               <button type="button" className="btn btn--primary btn--block" onClick={() => nav.openPage('smartplan')}>
                 See what could help
@@ -269,12 +290,20 @@ export function HomeScreen() {
                 <h2 className="card__title">We found a better way to split your money</h2>
               </div>
               <p className="muted small">
-                {plan.changes.length === 1 ? '1 change' : `${plan.changes.length} changes`}, each with a plain reason
-                why.
+                {plan.changes.length === 1 ? '1 suggested change' : `${plan.changes.length} suggested changes`}, each
+                with a short reason why. Nothing changes unless you say so.
               </p>
-              <button type="button" className="btn btn--primary btn--block" onClick={() => nav.openPage('smartplan')}>
-                See the Smart Plan
-              </button>
+              {needsBills ? (
+                // Adding bills is the one main thing to do right now; the plan is a quieter link until then.
+                <button type="button" className="card__action" onClick={() => nav.openPage('smartplan')}>
+                  <span>See the Smart Plan</span>
+                  <IconChevronRight size={18} />
+                </button>
+              ) : (
+                <button type="button" className="btn btn--primary btn--block" onClick={() => nav.openPage('smartplan')}>
+                  See the Smart Plan
+                </button>
+              )}
             </>
           ) : (
             <>

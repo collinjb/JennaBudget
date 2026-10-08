@@ -41,9 +41,12 @@ export function MoneyInput({
     <Field label={label} helper={helper} error={error} hideLabel={hideLabel} className={className}>
       {({ inputId, describedBy, invalid }) => (
         <div className={`field__control field__control--money${big ? ' field__control--big' : ''}`}>
-          <span className="field__prefix" aria-hidden="true">
-            $
-          </span>
+          {/* Someone who types "$1,234" already has a dollar sign, so don't show two. */}
+          {!value.trimStart().startsWith('$') && (
+            <span className="field__prefix" aria-hidden="true">
+              $
+            </span>
+          )}
           <input
             ref={inputRef}
             id={inputId}

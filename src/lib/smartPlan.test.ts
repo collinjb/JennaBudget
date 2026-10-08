@@ -162,6 +162,17 @@ describe('comfortable budget with nothing set up yet', () => {
     expect(fun.why).toBe(PLAN_WHY.fun);
   });
 
+  it('explains a fun-money cut differently from a raise', () => {
+    const data = budget({
+      incomes: [pay(500_000)],
+      bills: [bill({ amount: 100_000 })],
+      spending: [spending({ id: 'fun', name: 'Fun', monthly: 200_000, kind: 'fun' })],
+    });
+    const cut = buildSmartPlan(data, today);
+    expect(line(cut, 'fun').to).toBeLessThan(200_000);
+    expect(line(cut, 'fun').why).toBe(PLAN_WHY.funTrimmed);
+  });
+
   it('no debts and no goals: the rest stays as left over; no extra-debt line', () => {
     expect(plan.lines.map((l) => l.kind)).toEqual(['newGoal', 'newSpending']);
     expect(plan.leftOverAfter).toBe(130_000);

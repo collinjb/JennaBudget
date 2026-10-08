@@ -53,6 +53,8 @@ interface WantRow {
   spendingKind: SpendingCategory['kind'];
   isEF: boolean;
   amount: string;
+  /** Goals only: optional monthly amount to put toward it. */
+  monthly: string;
 }
 
 const FREQ_CHOICES: { value: IncomeFrequency; label: string; hint: string }[] = [
@@ -127,6 +129,10 @@ export function Onboarding() {
       for (const w of wants) {
         const r = checkMoney(w.amount, { required: true, allowZero: w.kind === 'spending' });
         if (r.error) next[`want-${w.key}`] = r.error;
+        if (w.kind === 'goal') {
+          const m = checkMoney(w.monthly);
+          if (m.error) next[`want-m-${w.key}`] = m.error;
+        }
       }
     }
     setErrors(next);
@@ -211,7 +217,7 @@ export function Onboarding() {
             emoji: w.emoji,
             target: c,
             saved: 0,
-            monthly: 0,
+            monthly: checkMoney(w.monthly).cents ?? 0,
             targetDate: null,
             isEmergencyFund: w.isEF && !out.goals.some((g) => g.isEmergencyFund),
           });
@@ -255,10 +261,10 @@ export function Onboarding() {
     if (existing) setDebts(debts.filter((d) => d !== existing));
     else setDebts([...debts, { key: rowKey(), name, type, custom: false, balance: '', rate: '', min: '', dueDay: 1 }]);
   };
-  const toggleWant = (w: Omit<WantRow, 'key' | 'amount'>) => {
+  const toggleWant = (w: Omit<WantRow, 'key' | 'amount' | 'monthly'>) => {
     const existing = wants.find((x) => x.name === w.name && x.kind === w.kind);
     if (existing) setWants(wants.filter((x) => x !== existing));
-    else setWants([...wants, { ...w, key: rowKey(), amount: '' }]);
+    else setWants([...wants, { ...w, key: rowKey(), amount: '', monthly: '' }]);
   };
 
   if (step === 0) {
@@ -266,9 +272,15 @@ export function Onboarding() {
       <div className="app onb onb--welcome">
         <div className="onb__scroll" ref={scrollRef}>
           <div className="onb__welcome">
-            <div className="onb__logo" aria-hidden="true">
-              <span>$</span>
-            </div>
+            {/* The same icon as on the home screen, so the app feels like one thing. */}
+            <img
+              className="onb__logo"
+              src={`${import.meta.env.BASE_URL}pwa-512x512.png`}
+              alt=""
+              width={104}
+              height={104}
+              decoding="async"
+            />
             <h1 className="onb__title onb__title--center">Welcome to Budget</h1>
             <p className="onb__lead onb__lead--center">
               See where your money goes and how much is left, all in one simple place. Everything stays on your phone.
@@ -393,6 +405,7 @@ export function Onboarding() {
                     setErr('payDate', null);
                   }}
                   error={errors.payDate}
+                  helper={freq === 'monthly' ? 'You get paid on this day every month.' : 'Any upcoming payday works.'}
                 />
               )}
             </div>
@@ -593,6 +606,18 @@ export function Onboarding() {
                     }}
                     error={errors[`want-${w.key}`]}
                   />
+                  {w.kind === 'goal' && (
+                    <MoneyInput
+                      label="How much can you put in each month?"
+                      value={w.monthly}
+                      onChange={(v) => {
+                        setWants(wants.map((x) => (x.key === w.key ? { ...x, monthly: v } : x)));
+                        setErr(`want-m-${w.key}`, null);
+                      }}
+                      error={errors[`want-m-${w.key}`]}
+                      helper="Optional. Not sure? Leave it blank and the Smart Plan will suggest an amount."
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -627,8 +652,8 @@ function RowHead({
       <span className="row__icon" aria-hidden="true">
         {emoji}
       </span>
-      <span className="onb-row__name ellipsis">
-        {name ?? 'New item'}
+      <span className="onb-row__name">
+        <span className="ellipsis">{name ?? 'New item'}</span>
         {tag && <span className="badge onb-row__tag">{tag}</span>}
       </span>
       <button type="button" className="onb-row__remove" aria-label={removeLabel} onClick={onRemove}>

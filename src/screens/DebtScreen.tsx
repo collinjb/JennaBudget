@@ -124,7 +124,7 @@ export function DebtScreen() {
               </>
             ) : (
               <>
-                <p className="bignum__label">Debt-free by</p>
+                <p className="bignum__label">Time until you're debt-free</p>
                 <p className="debt-summary__date tone-over" data-testid="debt-free-date">
                   More than 50 years
                 </p>
@@ -157,6 +157,7 @@ export function DebtScreen() {
               <span>
                 <strong>{w.name}:</strong> Your <Money cents={w.minPayment} /> payment doesn't cover the{' '}
                 <Money cents={w.monthlyInterest} /> of interest each month, so this balance will keep growing.
+                {base && base.months !== null && ' Your plan still pays it off later, once extra money goes to it.'}
               </span>
             </p>
           ))}
@@ -301,20 +302,27 @@ export function DebtScreen() {
                 </ol>
               </Card>
 
-              {/* Chart */}
+              {/* Chart (only when it actually comes down: 50 years of a growing balance is just a scary number) */}
               <Card title="Your debt over time">
-                <LineChart
-                  values={base.timeline}
-                  tone="debt"
-                  formatTop={(max) => formatMoney(max, { showCents: 'never' })}
-                  startLabel="Now"
-                  endLabel={base.debtFreeMonth ? formatMonth(base.debtFreeMonth, 'short') : '50+ years'}
-                  ariaLabel={
-                    base.debtFreeMonth
-                      ? `Your total debt goes from ${formatMoney(totalDebt, { showCents: 'never' })} now down to $0 in ${formatMonth(base.debtFreeMonth)}.`
-                      : `Your total debt of ${formatMoney(totalDebt, { showCents: 'never' })} doesn't reach $0 within 50 years at this pace.`
-                  }
-                />
+                {base.months === null ? (
+                  <p className="muted small">
+                    At this pace your debt grows instead of shrinking, so there's no payoff line to show yet. Try the
+                    &ldquo;Pay it off faster&rdquo; slider above to see what a little extra each month does.
+                  </p>
+                ) : (
+                  <LineChart
+                    values={base.timeline}
+                    tone="debt"
+                    formatTop={(max) => formatMoney(max, { showCents: 'never' })}
+                    startLabel="Now"
+                    endLabel={base.debtFreeMonth ? formatMonth(base.debtFreeMonth, 'short') : '50+ years'}
+                    ariaLabel={
+                      base.debtFreeMonth
+                        ? `Your total debt goes from ${formatMoney(totalDebt, { showCents: 'never' })} now down to $0 in ${formatMonth(base.debtFreeMonth)}.`
+                        : `Your total debt of ${formatMoney(totalDebt, { showCents: 'never' })} doesn't reach $0 within 50 years at this pace.`
+                    }
+                  />
+                )}
               </Card>
             </>
           )}

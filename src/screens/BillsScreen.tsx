@@ -176,7 +176,9 @@ function BillRow({
             )}
           </span>
         </button>
-        {onPaid && <Checkbox checked={s.paid} onChange={onPaid} label={`${b.name} paid`} caption="Paid" />}
+        {onPaid && (
+          <Checkbox checked={s.paid} onChange={onPaid} label={`${b.name} paid`} caption={s.paid ? 'Paid' : 'Paid?'} />
+        )}
       </div>
     </li>
   );

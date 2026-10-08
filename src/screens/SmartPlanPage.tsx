@@ -5,11 +5,12 @@ import { IconArrowRight, IconChevronDown, IconSparkle, IconWarning } from '../co
 import { Money } from '../components/Money';
 import { PageHeader } from '../components/PageHeader';
 import { useToast } from '../components/Toast';
-import { formatMonth } from '../lib/dates';
+import { formatMonth, monthKey } from '../lib/dates';
 import { formatMoney } from '../lib/money';
 import { applySmartPlan, buildSmartPlan, type PlanLine, type SmartPlan } from '../lib/smartPlan';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
+import type { Goal } from '../types';
 import { useNav } from './nav';
 import { plural } from './shared';
 
@@ -97,7 +98,7 @@ export function SmartPlanPage() {
             </section>
           )}
 
-          {plan.hasSuggestions && <Impact plan={plan} />}
+          {plan.hasSuggestions && <Impact plan={plan} goals={data.goals} />}
 
           {plan.hasSuggestions ? (
             <>
@@ -187,7 +188,7 @@ function PlanLineRow({ line: l, same }: { line: PlanLine; same?: boolean }) {
   );
 }
 
-function Impact({ plan }: { plan: SmartPlan }) {
+function Impact({ plan, goals }: { plan: SmartPlan; goals: Goal[] }) {
   const i = plan.impact;
   const items: ReactNode[] = [];
   if (i.monthsAfter !== null && i.debtFreeAfter && (i.monthsBefore === null || i.monthsAfter < i.monthsBefore)) {
@@ -208,7 +209,34 @@ function Impact({ plan }: { plan: SmartPlan }) {
     );
   }
   for (const g of i.goals) {
+    if (!g.after && g.before) {
+      items.push(
+        <>
+          Saving for <strong>{g.name}</strong> would pause for now, so the money can go where it's needed more.
+        </>,
+      );
+      continue;
+    }
     if (!g.after || g.after === g.before) continue;
+    if (g.before !== null && g.after > g.before) {
+      const deadline = goals.find((x) => x.id === g.id)?.targetDate;
+      // Slower than now (money moved to something more urgent): say so plainly, and whether it's still on time.
+      const onTime = deadline ? g.after <= monthKey(deadline) : false;
+      items.push(
+        onTime ? (
+          <>
+            You'd still reach <strong>{g.name}</strong> by <strong>{formatMonth(g.after)}</strong>, in time for its
+            target date.
+          </>
+        ) : (
+          <>
+            <strong>{g.name}</strong> would take a bit longer: <strong>{formatMonth(g.after)}</strong> instead of{' '}
+            {formatMonth(g.before)}.
+          </>
+        ),
+      );
+      continue;
+    }
     items.push(
       <>
         You'd reach <strong>{g.name}</strong> by <strong>{formatMonth(g.after)}</strong>
@@ -216,9 +244,17 @@ function Impact({ plan }: { plan: SmartPlan }) {
       </>,
     );
   }
+  const leftText = (cents: number) =>
+    cents < 0 ? (
+      <>
+        <Money cents={-cents} /> over
+      </>
+    ) : (
+      <Money cents={cents} />
+    );
   items.push(
     <>
-      Left over each month: <Money cents={plan.leftOverBefore} /> → <strong><Money cents={plan.leftOverAfter} /></strong>
+      Left over each month: {leftText(plan.leftOverBefore)} → <strong>{leftText(plan.leftOverAfter)}</strong>
       {plan.leftOverAfter > 0 ? ', a small cushion for surprises.' : '.'}
     </>,
   );
