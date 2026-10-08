@@ -55,12 +55,19 @@ export function RecoveryScreen() {
   const [updating, setUpdating] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
+  const freshButton = useRef<HTMLButtonElement>(null);
+  /** After Cancel, focus goes back to "Start fresh" instead of falling to the page. */
+  const backToFresh = useRef(false);
   // Data saved by a newer version of the app isn't damaged: updating the app is the real fix.
   const newerVersion = corruptReason === 'newer-version';
 
   // The "Erase everything?" question takes focus when it appears, so it's read right away.
   useEffect(() => {
     if (confirmFresh) confirmRef.current?.focus();
+    else if (backToFresh.current) {
+      backToFresh.current = false;
+      freshButton.current?.focus();
+    }
   }, [confirmFresh]);
 
   /** Restored data that has anything in it counts as set up (so onboarding can't show over it). */
@@ -226,6 +233,7 @@ export function RecoveryScreen() {
                   : "Erase what's saved in the app on this phone and set up a new budget."}
               </p>
               <button
+                ref={freshButton}
                 type="button"
                 className={`pwa-btn ${newerVersion ? 'pwa-btn--quiet' : 'pwa-btn--danger'}`}
                 onClick={() => setConfirmFresh(true)}
@@ -249,7 +257,14 @@ export function RecoveryScreen() {
                 <button type="button" className="pwa-btn pwa-btn--danger-solid" onClick={() => actions.reset()}>
                   Yes, erase and start fresh
                 </button>
-                <button type="button" className="pwa-btn pwa-btn--secondary" onClick={() => setConfirmFresh(false)}>
+                <button
+                  type="button"
+                  className="pwa-btn pwa-btn--secondary"
+                  onClick={() => {
+                    backToFresh.current = true;
+                    setConfirmFresh(false);
+                  }}
+                >
                   Cancel
                 </button>
               </div>

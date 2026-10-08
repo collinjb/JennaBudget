@@ -49,9 +49,10 @@ const MAX_TOASTS = 3;
  * from when it closes.
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const { data } = useBudget();
+  const { data, generation } = useBudget();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [seenData, setSeenData] = useState(data);
+  const [seenGeneration, setSeenGeneration] = useState(generation);
   const counter = useRef(0);
   const regionRef = useRef<HTMLDivElement>(null);
   /** Where focus was before it moved into a toast. */
@@ -60,6 +61,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // Drop "dismissOnChange" toasts once the budget changes after they appeared; arm new toasts.
   // (Adjusting state while rendering: no extra commit with a stale Undo on screen.)
   let next = toasts;
+  // The whole budget was replaced (example data, restore, start over): every older Undo now points at a budget
+  // that's gone, so drop them all. Toasts shown by that same action aren't armed yet and stay.
+  if (generation !== seenGeneration) {
+    setSeenGeneration(generation);
+    next = next.filter((t) => !t.armed);
+  }
   if (data !== seenData) {
     setSeenData(data);
     next = next.filter((t) => !(t.dismissOnChange && t.armed));

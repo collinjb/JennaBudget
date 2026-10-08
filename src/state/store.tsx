@@ -20,6 +20,8 @@ export interface Removed<K extends CollectionName> {
   index: number;
   /** Planned extra debt payment that was dropped because this was the last debt; Undo puts it back. */
   extraDebtPayment?: Cents;
+  /** Store generation at removal time: an Undo from before a whole-budget replace must not touch the new budget. */
+  generation: number;
 }
 
 export interface BudgetActions {
@@ -49,6 +51,8 @@ interface StoreValue {
   corruptError: string | null;
   /** 'newer-version' when the saved data came from a newer app (update instead of recovering); else 'damaged'. */
   corruptReason: 'damaged' | 'newer-version' | null;
+  /** Bumps whenever the whole budget is replaced or reset, so older Undo offers can tell they no longer apply. */
+  generation: number;
   /** Last save error (e.g. storage full / private mode), or null. */
   saveError: string | null;
   actions: BudgetActions;
@@ -67,7 +71,7 @@ interface InitialState {
 function initialState(): InitialState {
   const result = loadData();
   const fine = { corruptRaw: null, corruptError: null, corruptReason: null };
-  if (result.status === 'ok') return { data: result.data, status: 'ready', ...fine };
+  if (result.status === 'ok') return { data: withoutStaleExtra(result.data), status: 'ready', ...fine };
   if (result.status === 'corrupt') {
     return {
       data: emptyBudget(),
@@ -97,6 +101,12 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   // Latest data/status for synchronous reads inside actions (so back-to-back actions build on each other).
   const dataRef = useRef(init.data);
   const statusRef = useRef(init.status);
+  const generationRef = useRef(0);
+  const [generation, setGeneration] = useState(0);
+  const newGeneration = useCallback(() => {
+    generationRef.current += 1;
+    setGeneration(generationRef.current);
+  }, []);
 
   const markReady = useCallback(() => {
     statusRef.current = 'ready';
@@ -141,9 +151,14 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         update((d) => ({ ...d, [collection]: (d[collection] as { id: string }[]).filter((x) => x.id !== id) }));
         // Deleting the last debt drops the planned extra payment; remember it so Undo can put it back.
         const dropped = extraBefore > 0 && dataRef.current.settings.extraDebtPayment === 0;
-        return dropped ? { collection, item, index, extraDebtPayment: extraBefore } : { collection, item, index };
+        const generation = generationRef.current;
+        return dropped
+          ? { collection, item, index, generation, extraDebtPayment: extraBefore }
+          : { collection, item, index, generation };
       },
       restore(removed) {
+        // Removed before the whole budget was replaced (example data, restore, start over): it doesn't belong here.
+        if (removed.generation !== generationRef.current) return;
         update((d) => {
           const list = d[removed.collection] as CollectionItem<typeof removed.collection>[];
           if (list.some((x) => x.id === removed.item.id)) return d;
@@ -169,6 +184,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       },
       replaceAll(next) {
         markReady();
+        newGeneration();
         commit(next);
       },
       setBillPaid(id, month) {
@@ -185,10 +201,11 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       reset() {
         clearData();
         markReady();
+        newGeneration();
         commit(emptyBudget());
       },
     }),
-    [update, commit, markReady],
+    [update, commit, markReady, newGeneration],
   );
 
   const value = useMemo<StoreValue>(
@@ -198,10 +215,11 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       corruptRaw: init.corruptRaw,
       corruptError: init.corruptError,
       corruptReason: init.corruptReason,
+      generation,
       saveError,
       actions,
     }),
-    [data, status, init.corruptRaw, init.corruptError, init.corruptReason, saveError, actions],
+    [data, status, init.corruptRaw, init.corruptError, init.corruptReason, generation, saveError, actions],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

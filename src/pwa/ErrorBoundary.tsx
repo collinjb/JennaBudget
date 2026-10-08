@@ -47,9 +47,17 @@ function CrashScreen() {
   const [pending, setPending] = useState<Pending>(null);
   const [previous] = useState(() => loadPreviousData());
   const confirmRef = useRef<HTMLDivElement>(null);
+  const previousButton = useRef<HTMLButtonElement>(null);
+  const freshButton = useRef<HTMLButtonElement>(null);
+  /** The question that was just cancelled: focus goes back to the button that asked it. */
+  const cancelled = useRef<Pending>(null);
 
   useEffect(() => {
     if (pending) confirmRef.current?.focus();
+    else if (cancelled.current) {
+      (cancelled.current === 'previous' ? previousButton : freshButton).current?.focus();
+      cancelled.current = null;
+    }
   }, [pending]);
 
   const reload = () => {
@@ -129,7 +137,14 @@ function CrashScreen() {
               >
                 {pending === 'previous' ? 'Yes, restore it' : 'Yes, erase and start fresh'}
               </button>
-              <button type="button" className="pwa-btn pwa-btn--secondary" onClick={() => setPending(null)}>
+              <button
+                type="button"
+                className="pwa-btn pwa-btn--secondary"
+                onClick={() => {
+                  cancelled.current = pending;
+                  setPending(null);
+                }}
+              >
                 Cancel
               </button>
             </div>
@@ -138,11 +153,16 @@ function CrashScreen() {
           <div className="pwa-actions pwa-actions--more">
             <p className="pwa-note">Still not working after a reload?</p>
             {previous && (
-              <button type="button" className="pwa-btn pwa-btn--secondary" onClick={() => setPending('previous')}>
+              <button
+                ref={previousButton}
+                type="button"
+                className="pwa-btn pwa-btn--secondary"
+                onClick={() => setPending('previous')}
+              >
                 Restore the last good copy
               </button>
             )}
-            <button type="button" className="pwa-btn pwa-btn--danger" onClick={() => setPending('fresh')}>
+            <button ref={freshButton} type="button" className="pwa-btn pwa-btn--danger" onClick={() => setPending('fresh')}>
               Start fresh
             </button>
           </div>

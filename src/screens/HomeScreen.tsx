@@ -362,7 +362,7 @@ function NextPaycheckCard({ paycheckWindow: w, onOpen }: { paycheckWindow: Paych
           <ul className="mini-list" role="list">
             {shown.map((it) => (
               <li key={`${it.kind}-${it.id}-${it.date}`} className="mini-list__row">
-                <span className="mini-list__name ellipsis">
+                <span className="mini-list__name">
                   <span aria-hidden="true">{it.emoji} </span>
                   {it.name}
                 </span>

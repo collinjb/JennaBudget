@@ -82,14 +82,18 @@ export function SmartPlanPage() {
                 </span>
                 <h2 className="card__title">Your plan looks great</h2>
               </div>
-              <p className="small">There's nothing to change right now. Here's why your money is set up well.</p>
+              <p className="small">
+                {plan.changes.length > 0
+                  ? 'Only a few dollars could move. The small tweaks below are optional.'
+                  : "There's nothing to change right now. Here's why your money is set up well."}
+              </p>
             </Card>
           )}
 
           {plan.changes.length > 0 && (
             <section aria-labelledby="changes-title" className="stack stack--sm">
               <h2 className="section-title" id="changes-title">
-                Suggested changes
+                {plan.hasSuggestions ? 'Suggested changes' : 'Small tweaks (optional)'}
               </h2>
               <ul className="list plan-lines" role="list">
                 {plan.changes.map((l) => (
@@ -129,13 +133,21 @@ export function SmartPlanPage() {
               )}
             </>
           ) : (
-            plan.lines.length > 0 && (
-              <ul className="list plan-lines" role="list">
-                {plan.lines.map((l) => (
-                  <PlanLineRow key={`${l.kind}-${l.id ?? l.name}`} line={l} same />
-                ))}
-              </ul>
-            )
+            <>
+              {plan.changes.length > 0 && (
+                <button type="button" className="btn btn--secondary btn--block" onClick={use}>
+                  Use these small tweaks
+                </button>
+              )}
+              {/* Only lines that really stay the same; tweaked ones are listed above with their before → after. */}
+              {unchanged.length > 0 && (
+                <ul className="list plan-lines" role="list">
+                  {unchanged.map((l) => (
+                    <PlanLineRow key={`${l.kind}-${l.id ?? l.name}`} line={l} same />
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </>
       )}

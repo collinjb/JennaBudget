@@ -56,7 +56,8 @@ const H = 140;
 /** Simple falling line (with a soft area underneath). Labels are HTML so they never stretch. */
 export function LineChart({ values, ariaLabel, formatTop, startLabel, endLabel, tone = 'debt' }: LineChartProps) {
   const pts = downsample(values, 120);
-  const max = Math.max(1, ...pts);
+  // Scale and label by the true peak (downsampling can skip it).
+  const max = values.reduce((m, v) => Math.max(m, v), 1);
   const n = pts.length;
   const xy = pts.map((v, i) => {
     const x = n === 1 ? 0 : (i / (n - 1)) * W;

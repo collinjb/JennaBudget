@@ -84,7 +84,7 @@ export function PaycheckPlanPage() {
                           className={`mini-list__row${it.paid ? ' mini-list__row--paid' : ''}`}
                         >
                           <span className="mini-list__date">{formatDate(it.date, 'short')}</span>
-                          <span className="mini-list__name ellipsis">
+                          <span className="mini-list__name">
                             <span aria-hidden="true">{it.emoji} </span>
                             {it.name}
                             {it.paid && (

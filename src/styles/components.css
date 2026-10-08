@@ -931,6 +931,25 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
+  container-type: inline-size;
+}
+
+/*
+ * Large text (zoomed or bigger text settings): once a list is narrower than about 15 lines of text-width, the amount
+ * drops under the name instead of squeezing the name down to a few letters. Normal text sizes never hit this.
+ */
+@container (max-width: 15em) {
+  .row__tap,
+  button.row {
+    flex-wrap: wrap;
+  }
+  .row__main {
+    flex-basis: calc(100% - 52px); /* everything next to the 40px icon */
+  }
+  .row__end {
+    margin-left: auto;
+    max-width: none;
+  }
 }
 
 .list > li {

@@ -119,6 +119,20 @@
   display: flex;
   flex-direction: column;
   margin-top: 6px;
+  container-type: inline-size;
+}
+
+/* Large text: the amount moves to its own line so names stay readable. */
+@container (max-width: 15em) {
+  .mini-list__row {
+    flex-wrap: wrap;
+  }
+  .mini-list__name {
+    flex-basis: calc(100% - 3.5em - 10px);
+  }
+  .mini-list__amt {
+    margin-left: auto;
+  }
 }
 
 .mini-list__row {
@@ -144,6 +158,7 @@
 .mini-list__name {
   flex: 1 1 auto;
   min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .mini-list__amt {
@@ -417,12 +432,27 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  container-type: inline-size;
 }
 
 .debt-card__top {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* Large text: the balance drops under the name instead of squeezing it. */
+@container (max-width: 15em) {
+  .debt-card__top {
+    flex-wrap: wrap;
+  }
+  .debt-card__main {
+    flex-basis: calc(100% - 52px);
+  }
+  .debt-card__bal {
+    margin-left: auto;
+    max-width: none;
+  }
 }
 
 .debt-card__main {
@@ -642,6 +672,7 @@
 
 .window-card__sources {
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 
 .window-card__sub {
