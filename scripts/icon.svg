@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Budget app icon (master). A friendly wallet with a gold coin on a soft teal-to-blue gradient.
+    scripts/generate-icons.mjs renders every PNG from this file. It relies on two hooks:
+      - <g id="art"> must have NO transform attribute (the maskable variant scales it into the safe zone)
+      - the background must be full-bleed (iOS and maskable icons crop their own corners)
+  -->
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38d6c0"/>
+      <stop offset="0.55" stop-color="#2ea8e0"/>
+      <stop offset="1" stop-color="#2f6fed"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.22" cy="0.12" r="0.8">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="coinGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe680"/>
+      <stop offset="1" stop-color="#f9b625"/>
+    </linearGradient>
+    <linearGradient id="walletGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e9f3fb"/>
+    </linearGradient>
+    <linearGradient id="tabGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d7ecff"/>
+      <stop offset="1" stop-color="#bfdcfb"/>
+    </linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="20"/>
+      <feOffset dy="18" result="blur"/>
+      <feFlood flood-color="#0b2d63" flood-opacity="0.30"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect id="bg" width="1024" height="1024" fill="url(#bgGrad)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+
+  <g id="art">
+    <!-- Coin, tucked into the wallet -->
+    <g filter="url(#shadow)">
+      <circle cx="512" cy="336" r="166" fill="url(#coinGrad)"/>
+      <circle cx="512" cy="336" r="132" fill="none" stroke="#e8960c" stroke-opacity="0.35" stroke-width="12"/>
+      <path d="M568 282 C560 258 534 248 510 248 C480 248 456 264 456 290 C456 318 480 328 512 336 C546 344 570 356 570 384 C570 410 544 424 512 424 C484 424 460 414 452 390 M512 248 V214 M512 424 V458"
+            fill="none" stroke="#b76400" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse cx="414" cy="270" rx="34" ry="16" transform="rotate(-52 414 270)" fill="#ffffff" fill-opacity="0.6"/>
+    </g>
+
+    <!-- Wallet -->
+    <g filter="url(#shadow)">
+      <rect x="172" y="468" width="648" height="384" rx="96" fill="url(#walletGrad)"/>
+      <rect x="590" y="584" width="268" height="152" rx="76" fill="url(#tabGrad)"/>
+      <circle cx="668" cy="660" r="30" fill="#2f6fed"/>
+    </g>
+  </g>
+</svg>

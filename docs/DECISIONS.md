@@ -9,6 +9,20 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
 - **localStorage** for data (tiny JSON, synchronous, simple). A previous good copy is kept for recovery.
 - No router, no state library, no chart library: fewer moving parts, smaller bundle.
 
+## iPhone / PWA
+- Status bar style **`default`** (not `black-translucent`, which would put white status-bar text over the light background).
+- Updates: service worker in **prompt** mode. It checks on launch, when the app comes back to the foreground, when it goes
+  back online, and hourly. A "A new version is ready · Refresh" banner applies it, so a stale cache can never trap the
+  user, and an update never reloads the page in the middle of an edit.
+- Launch (splash) screens generated for 12 iPhone sizes in light and dark, kept out of the offline cache (only the
+  matching one is ever used).
+- `saveData` validates before writing, so a bug can never store data the app can't read back. The previous good copy is
+  kept under a second key for the recovery screen.
+- Validation tidies small things instead of rejecting them (trims names to 60 characters, drops unknown fields, keeps only one
+  safety-net goal). Dates must be between 1900 and 2999.
+- `navigator.storage.persist()` is requested on startup (best effort). Home-screen apps are also exempt from Safari's
+  7-day storage cleanup.
+
 ## Money & dates
 - Money is integer cents everywhere; interest rates are integer basis points (6.8% = 680).
 - Dates are local `YYYY-MM-DD` strings; helpers in `src/lib/dates.ts` avoid the UTC-parsing off-by-one-day bug.

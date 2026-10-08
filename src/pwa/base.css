@@ -1,0 +1,113 @@
+/*
+ * App-shell base styles for the iPhone home-screen app. Import once, right after tokens.css.
+ * Colors, fonts and spacing come from src/styles/tokens.css.
+ */
+
+/* ---- Page & shell ------------------------------------------------------------------------- */
+
+html {
+  height: 100%;
+  /* No rubber-banding of the whole app; scrollable areas inside still scroll normally. */
+  overscroll-behavior: none;
+  /* Taps fire instantly (no double-tap-to-zoom delay); pinch zoom still works for accessibility. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--bg);
+}
+
+body {
+  min-height: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  overscroll-behavior: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100vh; /* fallback for browsers without dvh */
+  min-height: 100dvh;
+}
+
+/* ---- Touch behavior ----------------------------------------------------------------------- */
+
+a,
+button,
+label,
+summary,
+select,
+[role='button'],
+[role='tab'],
+[role='switch'],
+[role='checkbox'] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+button,
+[role='button'],
+[role='tab'] {
+  /* Long-pressing a button shouldn't select its label or pop up a callout. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+img,
+svg {
+  -webkit-touch-callout: none;
+}
+
+/* ---- Form controls ------------------------------------------------------------------------ */
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* iPhone Safari zooms into any field with text smaller than 16px. Never let that happen. */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
+
+/* ---- Safe areas (notch, Dynamic Island, home indicator, landscape sides) --------------------
+ * The --safe-* variables are defined in tokens.css (env(safe-area-inset-*)). Utility classes: */
+
+.safe-top {
+  padding-top: var(--safe-top);
+}
+.safe-bottom {
+  padding-bottom: var(--safe-bottom);
+}
+.safe-left {
+  padding-left: var(--safe-left);
+}
+.safe-right {
+  padding-right: var(--safe-right);
+}
+.safe-x {
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+.safe-all {
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+
+/* A scrolling content area inside the fixed shell: momentum scrolling, no scroll chaining to the page. */
+.scroll-area {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
