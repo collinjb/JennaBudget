@@ -1,6 +1,6 @@
 import type { BudgetData, Cents, Debt, Goal, ISODate, MonthKey, PayoffMethod, SpendingCategory } from '../types';
 import { compareISO, formatMonth, monthKey } from './dates';
-import { payoffOrder, simulatePayoff } from './debt';
+import { interestWarnings, MAX_PAYOFF_MONTHS, payoffOrder, simulatePayoff } from './debt';
 import { billMonthly } from './frequency';
 import { projectGoal, type GoalProjection } from './goals';
 import { newId } from './ids';
@@ -88,6 +88,8 @@ export const PLAN_WHY = {
       ? `Paying extra on your ${name} (${formatRate(rateBps)} interest) gets you debt-free sooner and saves you money.`
       : `Paying extra on your ${name} gets you debt-free sooner.`,
   debtNone: "There's no extra money for debt right now. Your minimums are covered.",
+  debtGrowing: (name: string) =>
+    `Your ${name} payment doesn't cover its interest, so the balance grows every month. This extra stops that and pays it off.`,
   leverBill: 'Could you lower, switch, or cancel this?',
   leverNeed: 'Even a small trim here helps.',
 } as const;
@@ -171,6 +173,32 @@ function compareText(a: string, b: string): number {
   return a.localeCompare(b, 'en-US', { sensitivity: 'base' }) || (a < b ? -1 : a > b ? 1 : 0);
 }
 
+/**
+ * Smallest whole-dollar extra (<= cap) that pays these debts off within maxMonths, or null if even `cap` can't.
+ * Binary search: more extra never makes payoff slower.
+ */
+export function smallestExtraToFinish(
+  debts: Debt[],
+  method: PayoffMethod,
+  startMonth: MonthKey,
+  maxMonths: number,
+  cap: Cents,
+): Cents | null {
+  const finishes = (dollars: number) =>
+    simulatePayoff(debts, { method, extra: dollars * 100, startMonth, maxMonths }).months !== null;
+  let hi = Math.floor(Math.max(0, cap) / 100);
+  if (!finishes(hi)) return null;
+  let lo = 0;
+  if (finishes(lo)) return 0;
+  // Invariant: finishes(hi) && !finishes(lo)
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (finishes(mid)) hi = mid;
+    else lo = mid;
+  }
+  return hi * 100;
+}
+
 type DebtClass = 'none' | 'all' | 'high' | 'low' | 'other';
 
 /** Deterministic, rule-based. Algorithm specified in docs/SPEC.md (Smart Plan). Must be idempotent. */
@@ -248,6 +276,19 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
   const lines: PlanLine[] = [];
   /** Goal lines paired with their goal (for the impact section). */
   const goalLines: { line: PlanLine; goal: Goal }[] = [];
+
+  // ----- 0) A debt that grows every month comes first -----
+  // Its minimum doesn't cover the interest, so nothing else matters as much. Give it the smallest extra that pays it
+  // off within GROWING_DEBT_PAYOFF_MONTHS (capped at a share of free money), and never less than what stops it growing.
+  const growing = interestWarnings(activeDebts).map((w) => activeDebts.find((d) => d.id === w.debtId) as Debt);
+  let rescue = 0;
+  if (growing.length > 0) {
+    const all = floorDollars(R);
+    const stopGrowing = smallestExtraToFinish(growing, method, startMonth, MAX_PAYOFF_MONTHS, all) ?? all;
+    const target = smallestExtraToFinish(growing, method, startMonth, C.GROWING_DEBT_PAYOFF_MONTHS, all) ?? all;
+    rescue = Math.max(stopGrowing, Math.min(target, shareDollars(R, C.GROWING_DEBT_MAX_SHARE)));
+    R -= rescue;
+  }
 
   // ----- A) Safety net -----
   const ef = data.goals.find((g) => g.isEmergencyFund) ?? null;
@@ -383,8 +424,9 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
     debtClass = 'other';
     debtShare = C.OTHER_DEBT_SHARE;
   }
-  let extra = shareDollars(R, debtShare);
-  R -= extra;
+  const share = shareDollars(R, debtShare);
+  R -= share;
+  let extra = rescue + share;
 
   // ----- F) Open goals (no deadline, or the deadline passed): equal split, capped at what's left to save -----
   const caps = openGoals.map((g) => ceilDollars(project(g).remaining) / 100);
@@ -415,7 +457,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
       emoji: EXTRA_DEBT_LINE.emoji,
       from: S.debtExtra,
       to: extra,
-      why: extraDebtWhy(extra, debtClass, activeDebts, method),
+      why: rescue > 0 ? PLAN_WHY.debtGrowing(growing[0].name) : extraDebtWhy(extra, debtClass, activeDebts, method),
     });
   }
 

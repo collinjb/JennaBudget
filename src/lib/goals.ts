@@ -1,12 +1,12 @@
 import type { Cents, Goal, ISODate, MonthKey } from '../types';
-import { addMonthsToKey, monthKey, monthsBetween } from './dates';
+import { addMonthsToKey, compareISO, monthKey, monthsBetween } from './dates';
 import { ceilDiv } from './money';
 
 export type GoalStatus =
   | 'reached' //         saved >= target
   | 'on-track' //        has deadline, monthly >= neededPerMonth
   | 'behind' //          has deadline, monthly < neededPerMonth (incl. monthly = 0)
-  | 'past-due' //        deadline month is this month or earlier, not reached
+  | 'past-due' //        deadline date is before today, not reached
   | 'no-deadline' //     no deadline, monthly > 0
   | 'no-contribution'; // no deadline, monthly = 0
 
@@ -20,7 +20,10 @@ export interface GoalProjection {
   reachMonth: MonthKey | null;
   /** targetMonth - currentMonth when a deadline is set, else null. */
   monthsLeft: number | null;
-  /** ceil(remaining / monthsLeft) when deadline set and monthsLeft > 0; remaining when past-due; else null. */
+  /**
+   * ceil(remaining / monthsLeft) when deadline set and monthsLeft > 0; remaining when the deadline is later this
+   * month (monthsLeft 0) or past-due; else null.
+   */
   neededPerMonth: Cents | null;
   status: GoalStatus;
 }
@@ -46,9 +49,11 @@ export function projectGoal(goal: Goal, today: ISODate): GoalProjection {
     if (monthsLeft > 0) neededPerMonth = ceilDiv(remaining, monthsLeft);
     else if (!reached) neededPerMonth = remaining;
   }
+  // Only a date that has actually gone by is past due; a deadline later this month still needs the rest now.
+  const pastDue = goal.targetDate !== null && compareISO(goal.targetDate, today) < 0;
   if (reached) status = 'reached';
   else if (monthsLeft !== null) {
-    if (monthsLeft <= 0) status = 'past-due';
+    if (pastDue) status = 'past-due';
     else status = monthly >= (neededPerMonth ?? 0) ? 'on-track' : 'behind';
   } else status = monthly > 0 ? 'no-deadline' : 'no-contribution';
 

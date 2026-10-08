@@ -1,5 +1,5 @@
 import { IconCheck, IconWarning } from '../components/Icons';
-import { formatMonth, monthKey } from '../lib/dates';
+import { formatDate, formatMonth, monthKey } from '../lib/dates';
 import { projectGoal, type GoalProjection } from '../lib/goals';
 import { formatMoney } from '../lib/money';
 import type { Goal, ISODate } from '../types';
@@ -17,6 +17,10 @@ export function goalStatusText(goal: Goal, p: GoalProjection): string {
     case 'on-track':
       return `On track for ${deadline}`;
     case 'behind':
+      // Deadline later this month: there's only this month left, so name the day and skip "/month".
+      if (p.monthsLeft === 0 && goal.targetDate) {
+        return `To reach ${formatMoney(goal.target)} by ${formatDate(goal.targetDate, 'short')}, save ${formatMoney(p.neededPerMonth ?? 0)} this month`;
+      }
       return `To reach ${formatMoney(goal.target)} by ${deadline}, save ${formatMoney(p.neededPerMonth ?? 0)}/month`;
     case 'past-due':
       return 'This date has passed. Pick a new one?';

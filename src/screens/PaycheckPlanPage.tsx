@@ -60,7 +60,8 @@ export function PaycheckPlanPage() {
                   {w.payday.sources.length > 1 && (
                     <p className="muted small window-card__sources">
                       {w.payday.sources.map((s, i) => (
-                        <span key={s.incomeId}>
+                        // One income can pay twice on the same day (e.g. "30th and last day" in February).
+                        <span key={`${s.incomeId}-${i}`}>
                           {i > 0 && ' + '}
                           {s.name} <Money cents={s.amount} />
                         </span>

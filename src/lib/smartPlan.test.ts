@@ -5,10 +5,12 @@ import {
   PLAN_WHY,
   applySmartPlan,
   buildSmartPlan,
+  smallestExtraToFinish,
   splitByWeight,
   splitEquallyWithCaps,
   type SmartPlan,
 } from './smartPlan';
+import { simulatePayoff } from './debt';
 import { monthlySummary } from './summary';
 import { bill, budget, debt, goal, income, spending } from './testUtils';
 
@@ -393,11 +395,12 @@ describe('goals with a deadline', () => {
 
 describe('extra debt vs open goals', () => {
   // income $5,000, bills $2,000, minimum $100 => free $2,900; EF full; fun $500 (new); buffer $100 → $2,300 left
-  const make = (rateBps: number, withGoal = true, method: 'avalanche' | 'snowball' = 'avalanche') =>
+  // $4,000 keeps the 24.99% card's interest ($83.30) under its $100 minimum, so the growing-debt rule stays out of it.
+  const make = (rateBps: number, withGoal = true, method: 'avalanche' | 'snowball' = 'avalanche', balance = 400_000) =>
     budget({
       incomes: [pay(500_000)],
       bills: [bill({ amount: 200_000 })],
-      debts: [debt({ id: 'd', name: 'Credit Card', balance: 500_000, rateBps, minPayment: 10_000 })],
+      debts: [debt({ id: 'd', name: 'Credit Card', balance, rateBps, minPayment: 10_000 })],
       goals: withGoal ? [fullEF(), goal({ id: 'house', name: 'House', target: 10_000_000 })] : [fullEF()],
       settings: { payoffMethod: method },
     });
@@ -460,18 +463,56 @@ describe('extra debt vs open goals', () => {
 
   it('a mix of high and low debts counts as high interest', () => {
     const data = make(300);
-    data.debts.push(debt({ name: 'Card', balance: 100_000, rateBps: 2200, minPayment: 0 }));
+    data.debts.push(debt({ name: 'Card', balance: 100_000, rateBps: 2200, minPayment: 2_500 }));
     const plan = buildSmartPlan(data, today);
-    expect(line(plan, 'Extra debt payment').to).toBe(172_500);
+    // free $2,875 - fun $500 - buffer $100 = $2,275 => 75% = $1,706
+    expect(line(plan, 'Extra debt payment').to).toBe(170_600);
     expect(line(plan, 'Extra debt payment').why).toBe(PLAN_WHY.debtHighAvalanche('Card', 2200));
   });
 
   it('impact: a debt the minimum never pays off becomes finite with the plan', () => {
     // $5,000 at 24.99% => $104.12 interest per month > $100 minimum
-    const plan = buildSmartPlan(make(2499), today);
+    const plan = buildSmartPlan(make(2499, true, 'avalanche', 500_000), today);
     expect(plan.impact.monthsBefore).toBeNull();
     expect(plan.impact.debtFreeBefore).toBeNull();
     expect(plan.impact.monthsAfter).not.toBeNull();
+  });
+
+  it('a growing debt is handled first and explained', () => {
+    const data = make(2499, true, 'avalanche', 500_000);
+    const plan = buildSmartPlan(data, today);
+    const extra = line(plan, 'Extra debt payment');
+    expect(extra.why).toBe(PLAN_WHY.debtGrowing('Credit Card'));
+    expect(plan.impact.monthsAfter ?? Infinity).toBeLessThanOrEqual(60);
+    checkInvariants(data, plan);
+  });
+
+  it('a growing debt gets at least enough to stop growing, even when money is tight', () => {
+    // free money $30: the 60-month target is out of reach, but the debt must still shrink
+    const data = budget({
+      incomes: [pay(213_000)],
+      bills: [bill({ amount: 200_000 })],
+      debts: [debt({ id: 'd', name: 'Credit Card', balance: 500_000, rateBps: 2499, minPayment: 10_000 })],
+    });
+    const plan = buildSmartPlan(data, today);
+    expect(plan.feasible).toBe(true);
+    expect(plan.impact.monthsBefore).toBeNull();
+    expect(plan.impact.monthsAfter).not.toBeNull();
+    const extra = line(plan, 'Extra debt payment').to;
+    // rescue = max(stop-growing amount, min(60-month target, half of free money)), then more debt money later
+    expect(extra).toBeGreaterThanOrEqual(smallestExtraToFinish(data.debts, 'avalanche', '2026-10', 600, 3_000) ?? Infinity);
+    expect(extra).toBeLessThanOrEqual(3_000);
+    checkInvariants(data, plan);
+  });
+
+  it('smallestExtraToFinish finds the exact smallest whole-dollar amount', () => {
+    const d = [debt({ balance: 500_000, rateBps: 2499, minPayment: 10_000 })];
+    const x = smallestExtraToFinish(d, 'avalanche', '2026-10', 60, 1_000_000) as number;
+    expect(x % 100).toBe(0);
+    expect(simulatePayoff(d, { method: 'avalanche', extra: x, startMonth: '2026-10', maxMonths: 60 }).months).not.toBeNull();
+    expect(simulatePayoff(d, { method: 'avalanche', extra: x - 100, startMonth: '2026-10', maxMonths: 60 }).months).toBeNull();
+    expect(smallestExtraToFinish(d, 'avalanche', '2026-10', 60, 100)).toBeNull();
+    expect(smallestExtraToFinish([debt({ rateBps: 0 })], 'avalanche', '2026-10', 600, 0)).toBe(0);
   });
 
   it('impact: debt-free sooner and less interest with the plan', () => {

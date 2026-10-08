@@ -68,12 +68,20 @@ describe('projectGoal', () => {
     expect(p.status).toBe('behind');
   });
 
-  it('past-due: deadline this month or earlier and not reached', () => {
+  it('deadline later this month: still open, needs the rest now', () => {
     const thisMonth = projectGoal(goal({ target: 50_000, saved: 10_000, monthly: 5_000, targetDate: '2026-10-31' }), today);
-    expect(thisMonth.status).toBe('past-due');
+    expect(thisMonth.status).toBe('behind');
     expect(thisMonth.monthsLeft).toBe(0);
     expect(thisMonth.neededPerMonth).toBe(40_000);
     expect(thisMonth.monthsToGoal).toBe(8);
+    const covered = projectGoal(goal({ target: 50_000, saved: 10_000, monthly: 40_000, targetDate: '2026-10-08' }), today);
+    expect(covered.status).toBe('on-track'); // due today counts as not yet passed
+  });
+
+  it('past-due: deadline date before today and not reached', () => {
+    const yesterday = projectGoal(goal({ target: 50_000, saved: 10_000, monthly: 5_000, targetDate: '2026-10-07' }), today);
+    expect(yesterday.status).toBe('past-due');
+    expect(yesterday.neededPerMonth).toBe(40_000);
     const earlier = projectGoal(goal({ target: 50_000, saved: 10_000, monthly: 0, targetDate: '2025-12-25' }), today);
     expect(earlier.status).toBe('past-due');
     expect(earlier.monthsLeft).toBe(-10);

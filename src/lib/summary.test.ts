@@ -160,6 +160,31 @@ describe('homeBreakdown', () => {
     const h = homeBreakdown(s);
     expect(h.over).toBe(true);
     expect(h.leftOver).toBe(-100);
+    // ...and the shown parts still add up: bills rounds up to $1,001 against $1,000 take-home.
+    expect(h.parts.map((p) => p.cents)).toEqual([100_100, 0, 0, 0, 0]);
+    expect(h.income - h.parts.reduce((t, p) => t + p.cents, 0)).toBe(h.leftOver);
+  });
+
+  it('property: over-budget parts always equal income + overage', () => {
+    let seed = 7;
+    const rand = (n: number) => {
+      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return seed % n;
+    };
+    for (let i = 0; i < 500; i++) {
+      const pay = 50_000 + rand(500_000);
+      const s = monthlySummary(
+        budget({
+          incomes: [income({ frequency: 'monthly', amount: pay })],
+          bills: [bill({ amount: pay - 500 + rand(1_000) }), bill({ id: 'b2', amount: rand(5_000) })],
+          spending: [spending({ monthly: rand(3_000) })],
+        }),
+      );
+      const h = homeBreakdown(s);
+      if (!h.over) continue;
+      expect(h.leftOver).toBeLessThanOrEqual(-100);
+      expect(h.income - h.parts.reduce((t, p) => t + p.cents, 0)).toBe(h.leftOver);
+    }
   });
 
   it('exactly zero left over is not over', () => {

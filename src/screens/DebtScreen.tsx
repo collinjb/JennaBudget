@@ -280,7 +280,8 @@ export function DebtScreen() {
                   ]}
                   helper={METHOD_INFO[method].text}
                 />
-                <h3 className="order-title">Payoff order</h3>
+                {/* Listed in the order they finish (a small debt can finish early on its minimum alone). */}
+                <h3 className="order-title">When each debt is paid off</h3>
                 <ol className="order-list">
                   {base.perDebt.map((p, i) => {
                     const d = active.find((x) => x.id === p.id);
@@ -369,16 +370,26 @@ function ExtraResult({
     if (monthsSooner && monthsSooner > 0) {
       return (
         <>
-          You'd be debt-free <strong>{monthsSooner === 1 ? '1 month' : `${monthsSooner} months`} sooner</strong> and
-          save <strong>{formatMoney(interestSaved)}</strong> in interest.
+          You'd be debt-free <strong>{monthsSooner === 1 ? '1 month' : `${monthsSooner} months`} sooner</strong>
+          {interestSaved > 0 ? (
+            <>
+              {' '}
+              and save <strong>{formatMoney(interestSaved)}</strong> in interest.
+            </>
+          ) : (
+            '.'
+          )}
         </>
       );
     }
-    return (
-      <>
-        You'd save <strong>{formatMoney(interestSaved)}</strong> in interest.
-      </>
-    );
+    if (interestSaved > 0) {
+      return (
+        <>
+          You'd save <strong>{formatMoney(interestSaved)}</strong> in interest.
+        </>
+      );
+    }
+    return <>That doesn't change your debt-free month yet. Try a bigger amount.</>;
   }
   // Less than planned
   const extraInterest = Math.max(0, withExtra.totalInterest - base.totalInterest);

@@ -94,10 +94,17 @@ export function homeBreakdown(summary: MonthlySummary): HomeBreakdown {
       over: false,
     };
   }
-  const [b, d, sv, sp] = apportionDollars([bills, debt, savings, spending]);
+  const out = apportionDollars([bills, debt, savings, spending]);
   const income = roundDiv(summary.income, 100) * 100;
-  // Never show "$0 over" when the real figure is over by a few cents: round the overage up to at least $1.
-  const leftOver = Math.min(-100, income - (b + d + sv + sp));
+  // Never show "$0 over" when the real figure is over by a few cents: round the outgo up so it's at least
+  // $1 more than income (bumping the largest part), which keeps "parts = income + overage" exact.
+  const shortOfOneDollar = income + 100 - out.reduce((s, x) => s + x, 0);
+  if (shortOfOneDollar > 0) {
+    const largest = out.indexOf(Math.max(...out));
+    out[largest] += shortOfOneDollar;
+  }
+  const [b, d, sv, sp] = out;
+  const leftOver = income - (b + d + sv + sp);
   return {
     parts: [
       { key: 'bills', cents: b },

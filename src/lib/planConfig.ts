@@ -25,6 +25,10 @@ export const PLAN_CONFIG = {
   OTHER_DEBT_SHARE: 0.5,
   /** Only low-rate debt (all under 5%): share of what is left that goes to extra debt payments (rest to goals). */
   LOW_INTEREST_DEBT_SHARE: 0.25,
+  /** A debt whose minimum doesn't cover its interest gets enough extra (first) to be paid off within this many months... */
+  GROWING_DEBT_PAYOFF_MONTHS: 60,
+  /** ...but that target never takes more than this share of free money (it always gets at least enough to stop growing). */
+  GROWING_DEBT_MAX_SHARE: 0.5,
   /** A line counts as "changed" only if it moves by at least $5. */
   MIN_CHANGE: 500,
 } as const;

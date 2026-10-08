@@ -9,7 +9,7 @@ import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatDate, formatDuration, formatMonth, monthKey } from '../lib/dates';
 import { interestWarnings, simulatePayoff } from '../lib/debt';
-import { formatMoney } from '../lib/money';
+import { ceilDollars, formatMoney } from '../lib/money';
 import { paycheckPlan } from '../lib/schedule';
 import { buildSmartPlan } from '../lib/smartPlan';
 import { homeBreakdown, monthlySummary, type BreakdownKey } from '../lib/summary';
@@ -273,7 +273,8 @@ export function HomeScreen() {
               <p className="muted small">
                 Even before savings and fun, your bills, minimum debt payments, and must-have spending cost{' '}
                 <strong>
-                  <Money cents={plan.shortfall} showCents="never" /> more
+                  {/* Round up so a shortfall of a few cents never reads "$0 more". */}
+                  <Money cents={ceilDollars(plan.shortfall)} showCents="never" /> more
                 </strong>{' '}
                 than you take home each month. Let's look at what could help.
               </p>
