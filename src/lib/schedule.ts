@@ -12,7 +12,9 @@ import {
   monthKey,
   monthStart,
 } from './dates';
+import { minimumDue } from './debt';
 import { DEBT_TYPE_INFO } from './presets';
+import { compareText } from './text';
 
 export interface PayEvent {
   date: ISODate;
@@ -201,10 +203,6 @@ export interface PaycheckWindow {
   shortBy: Cents;
 }
 
-function compareText(a: string, b: string): number {
-  return a.localeCompare(b, 'en-US', { sensitivity: 'base' }) || (a < b ? -1 : a > b ? 1 : 0);
-}
-
 /** Bill occurrences + debt minimum payments due in [start, end), sorted by date then name. */
 export function itemsDueBetween(data: BudgetData, start: ISODate, end: ISODate): PlanItem[] {
   const items: PlanItem[] = [];
@@ -222,7 +220,7 @@ export function itemsDueBetween(data: BudgetData, start: ISODate, end: ISODate):
     }
   }
   for (const debt of data.debts) {
-    const amount = Math.min(debt.minPayment, debt.balance);
+    const amount = minimumDue(debt.minPayment, debt.balance);
     if (!(amount > 0)) continue;
     for (const date of debtDueDates(debt, start, end)) {
       items.push({

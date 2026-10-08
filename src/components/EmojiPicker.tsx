@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { EMOJI_CHOICES } from '../lib/presets';
 
 interface EmojiPickerProps {
@@ -12,10 +12,20 @@ interface EmojiPickerProps {
 export function EmojiPicker({ value, onChange, label = 'icon' }: EmojiPickerProps) {
   const [open, setOpen] = useState(false);
   const gridId = useId();
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const choices = EMOJI_CHOICES.includes(value) || !value ? EMOJI_CHOICES : [value, ...EMOJI_CHOICES];
+  // Escape closes just the grid (not the whole sheet) and puts focus back on the button.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Escape' || !open) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(false);
+    buttonRef.current?.focus();
+  };
   return (
-    <div className="emoji-picker">
+    <div className="emoji-picker" onKeyDown={onKeyDown}>
       <button
+        ref={buttonRef}
         type="button"
         className="emoji-picker__button"
         aria-expanded={open}

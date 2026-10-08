@@ -27,19 +27,31 @@
 
 .page-header__row {
   display: flex;
+  /* With larger text a long title gets the whole line and the button moves under it (no words cut in half). */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   min-height: 44px;
+}
+
+.page-header__row > .add-pill,
+.page-header__row > .icon-btn {
+  margin-left: auto;
 }
 
 .page-header__title {
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: min(100%, min-content);
   font-size: var(--fs-large-title);
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.12;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+}
+
+/* The title takes focus when a page opens (for screen readers); it isn't a control, so no ring. */
+.page-header__title:focus {
+  outline: none;
 }
 
 .page-header__sub {
@@ -182,11 +194,17 @@
 }
 
 .bignum--xl .bignum__value {
-  font-size: clamp(2.6rem, 14vw, var(--fs-big));
+  /* Grows with the screen; with larger text it still fits a small phone (overflow-wrap is the last resort). */
+  font-size: clamp(2rem, 14vw, var(--fs-big));
 }
 
 .bignum--lg .bignum__value {
-  font-size: clamp(2rem, 10vw, 2.5rem);
+  font-size: clamp(1.5rem, 10vw, 2.5rem);
+}
+
+/* A big amount may wrap after its "≈" rather than run off a small screen with larger text. */
+.bignum__value .money {
+  white-space: normal;
 }
 
 .bignum--md .bignum__value {
@@ -221,7 +239,7 @@
   align-items: center;
   min-height: 52px;
   background: var(--field);
-  border: 1.5px solid var(--field-border);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius-md);
   transition:
     border-color var(--dur-fast) ease,
@@ -235,6 +253,13 @@
 
 .field--error .field__control {
   border-color: var(--c-over);
+  box-shadow: inset 0 0 0 1px var(--c-over);
+}
+
+.field--error .field__control:focus-within {
+  box-shadow:
+    inset 0 0 0 1px var(--c-over),
+    0 0 0 3px color-mix(in srgb, var(--c-over) 28%, transparent);
 }
 
 .input {
@@ -259,7 +284,7 @@
 
 .input::placeholder {
   color: var(--text-2);
-  opacity: 0.75;
+  opacity: 1;
 }
 
 .input--money {
@@ -283,6 +308,18 @@
 
 .field__prefix {
   padding-left: 14px;
+}
+
+/* A decorative emoji in front of a select (e.g. the chosen debt type). */
+.field__prefix--deco {
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 400;
+  padding-right: 0;
+}
+
+.field__prefix--deco + .input {
+  padding-left: 8px;
 }
 
 .field__suffix {
@@ -360,6 +397,13 @@
   min-width: 0;
 }
 
+/* A group of fields with one shared error (e.g. the two twice-a-month paydays). */
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .form {
   display: flex;
   flex-direction: column;
@@ -389,7 +433,7 @@
   padding: 3px;
   background: var(--fill);
   border-radius: 12px;
-  min-height: 44px;
+  min-height: 50px;
 }
 
 .seg__thumb {
@@ -400,6 +444,8 @@
   width: calc((100% - 6px) / var(--seg-count));
   transform: translateX(calc(100% * var(--seg-index)));
   background: var(--surface);
+  /* The chosen option is outlined, not just a slightly lighter pill (WCAG 1.4.11). */
+  border: 2px solid var(--link);
   border-radius: 9px;
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.12),
@@ -437,7 +483,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
+  min-height: 44px;
   padding: 4px 6px;
   font-size: var(--fs-subhead);
   font-weight: 500;
@@ -474,6 +520,7 @@
   display: flex;
   flex-direction: column;
   background: var(--field);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
@@ -572,7 +619,11 @@
   height: 31px;
   border-radius: 999px;
   background: var(--fill-strong);
-  transition: background-color var(--dur-fast) ease;
+  /* Off: an outline you can see against the row (WCAG 1.4.11). */
+  box-shadow: inset 0 0 0 1px var(--field-border);
+  transition:
+    background-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
 }
 
 .toggle__thumb {
@@ -588,7 +639,8 @@
 }
 
 .toggle__input:checked + .toggle__track {
-  background: var(--c-savings);
+  background: var(--toggle-on);
+  box-shadow: none;
 }
 
 .toggle__input:checked + .toggle__track .toggle__thumb {
@@ -631,6 +683,10 @@
 }
 
 .emoji-picker__current {
+  max-width: 56px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
   font-size: 2rem;
   line-height: 1.1;
 }
@@ -706,6 +762,9 @@
 
 .chip__emoji {
   font-size: 1.15rem;
+  max-width: 2.5em;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .chip__label {
@@ -851,9 +910,10 @@
 
 .row__line {
   display: flex;
+  flex-wrap: wrap; /* with larger text the amount moves under the name instead of squeezing it */
   align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
+  gap: 0 10px;
   min-width: 0;
 }
 
@@ -863,6 +923,7 @@
 
 .row__line > :last-child {
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .list {
@@ -874,6 +935,11 @@
 
 .list > li {
   position: relative;
+}
+
+/* Lists clip their rounded corners, so focus rings inside them sit just inside the row. */
+.list :focus-visible {
+  outline-offset: -3px;
 }
 
 .list > li + li::before {
@@ -933,10 +999,12 @@ button.row {
   place-items: center;
   width: 40px;
   height: 40px;
+  overflow: hidden; /* a long "icon" from an old backup can't push the row sideways */
   border-radius: 12px;
   background: var(--surface-2);
   font-size: 1.35rem;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .row__main {
@@ -1065,6 +1133,15 @@ button.row {
   margin-top: 1px;
 }
 
+/* Text next to an icon: may shrink, and a very long name wraps instead of pushing the page sideways. */
+.notice > span,
+.banner__text,
+.goal-status > span,
+.field__error > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .notice--warn {
   background: var(--c-warn-soft);
   color: var(--text);
@@ -1161,6 +1238,7 @@ button.row {
   color: var(--text);
   font-weight: 600;
   text-align: right;
+  white-space: nowrap;
 }
 
 /* ---------- Tab bar ---------- */
@@ -1219,14 +1297,15 @@ button.row {
 }
 
 .tabbar__label {
-  font-size: 0.6875rem; /* 11px */
+  /* 11px, growing with larger text up to 15px (like iOS tab bars) so a label needs at most two lines. */
+  font-size: min(0.6875rem, 15px);
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.1;
-  white-space: nowrap;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: center;
+  /* With larger text a label wraps onto two lines (the bar grows) instead of being cut off. */
+  overflow-wrap: break-word;
 }
 
 /* ---------- Bottom sheet ---------- */
@@ -1293,10 +1372,10 @@ button.row {
 .sheet__title {
   font-size: var(--fs-headline);
   font-weight: 700;
+  line-height: 1.25;
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .sheet__hbtn {
@@ -1399,6 +1478,7 @@ button.row {
 .dialog {
   position: relative;
   width: min(100%, 320px);
+  max-height: calc(100vh - 48px); /* fallback for browsers without dvh */
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
   background: var(--surface);
@@ -1482,16 +1562,24 @@ button.row {
 
 /* ---------- Toast ---------- */
 
+/* Above sheets (so an Undo is never hidden behind one), below confirm dialogs and the celebration. */
 .toast-region {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 12px);
-  z-index: 90;
+  bottom: calc(var(--safe-bottom) + 16px);
+  z-index: 150;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   padding: 0 calc(12px + var(--safe-right)) 0 calc(12px + var(--safe-left));
   pointer-events: none;
+}
+
+/* Room for the tab bar only when it's showing (full-screen pages have none). */
+body:has(.tabbar) .toast-region {
+  bottom: calc(var(--tabbar-space, var(--tabbar-h)) + var(--safe-bottom) + 12px);
 }
 
 .toast {
@@ -1726,23 +1814,6 @@ button.row {
   font-weight: 600;
 }
 
-.ring__track {
-  fill: none;
-  stroke: var(--fill);
-  stroke-width: 5;
-}
-
-.ring__fill {
-  fill: none;
-  stroke-width: 5;
-  stroke-linecap: round;
-  transition: stroke-dasharray 600ms var(--ease-out);
-}
-
-.ring.tone-savings .ring__fill {
-  stroke: var(--c-savings);
-}
-
 /* ---------- Celebration ---------- */
 
 .celebrate {
@@ -1790,9 +1861,10 @@ button.row {
   align-items: center;
   gap: 8px;
   width: min(100%, 320px);
-  padding: 28px 20px 18px;
+  padding: 28px 20px 20px;
   border: 0;
   border-radius: 24px;
+  text-align: center;
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-lg);
@@ -1820,12 +1892,11 @@ button.row {
   font-size: var(--fs-callout);
   color: var(--text-2);
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
-.celebrate__hint {
-  margin-top: 8px;
-  font-size: var(--fs-footnote);
-  color: var(--text-2);
+.celebrate__done {
+  margin-top: 10px;
 }
 
 /* ---------- Banners ---------- */

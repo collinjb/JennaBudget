@@ -18,7 +18,11 @@ interface FieldProps {
   id?: string;
 }
 
-/** Label + control + helper text + inline error. Every input in the app goes through this. */
+/**
+ * Label + control + helper text + inline error. Every input in the app goes through this.
+ * The error is tied to the control with aria-describedby (read when the field is focused); the form moves focus to
+ * the first invalid field and makes one polite announcement, so an error is never read twice.
+ */
 export function Field({ label, helper, error, hideLabel, className, children, id }: FieldProps) {
   const autoId = useId();
   const inputId = id ?? `f${autoId}`;
@@ -32,7 +36,7 @@ export function Field({ label, helper, error, hideLabel, className, children, id
       </label>
       {children({ inputId, describedBy, invalid: !!error })}
       {error && (
-        <p className="field__error" id={errorId} role="alert">
+        <p className="field__error" id={errorId}>
           <IconWarning size={16} />
           <span>{error}</span>
         </p>
@@ -87,7 +91,7 @@ export function TextField({
             placeholder={placeholder}
             autoComplete="off"
             autoCapitalize={autoCapitalize}
-            enterKeyHint="next"
+            enterKeyHint="done"
             aria-invalid={invalid || undefined}
             aria-describedby={describedBy}
             onChange={(e) => onChange(e.target.value)}
@@ -134,8 +138,11 @@ export function Toggle({ label, checked, onChange, helper }: ToggleProps) {
   );
 }
 
-/** Trim a name; fall back to a default when blank. Max 40 characters. */
+/** Longest name the forms keep, in characters (an emoji counts as one, so it's never cut in half). */
+export const MAX_NAME_CHARS = 40;
+
+/** Trim a name; fall back to a default when blank. Max 40 characters (whole characters, not UTF-16 units). */
 export function cleanName(value: string, fallback: string): string {
-  const v = value.trim().replace(/\s+/g, ' ').slice(0, 40);
+  const v = Array.from(value.trim().replace(/\s+/g, ' ')).slice(0, MAX_NAME_CHARS).join('').trim();
   return v || fallback;
 }

@@ -1,20 +1,24 @@
 /*
- * App-shell base styles for the iPhone home-screen app. Import once, right after tokens.css.
- * Colors, fonts and spacing come from src/styles/tokens.css.
+ * Page shell for the iPhone home-screen app: the one home for html/body, tap highlight and touch behavior.
+ * Imported last (main.tsx), right after tokens.css. Colors, fonts and spacing come from src/styles/tokens.css.
  */
 
 /* ---- Page & shell ------------------------------------------------------------------------- */
 
 html {
   height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* No gray flash on tap anywhere (the property is inherited). */
+  -webkit-tap-highlight-color: transparent;
   /* No rubber-banding of the whole app; scrollable areas inside still scroll normally. */
   overscroll-behavior: none;
   /* Taps fire instantly (no double-tap-to-zoom delay); pinch zoom still works for accessibility. */
   touch-action: manipulation;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-  -webkit-tap-highlight-color: transparent;
-  background: var(--bg);
 }
 
 body {
@@ -25,6 +29,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
+  font-size: var(--fs-body);
   line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -47,7 +52,6 @@ select,
 [role='tab'],
 [role='switch'],
 [role='checkbox'] {
-  -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
 
@@ -67,47 +71,9 @@ svg {
 
 /* ---- Form controls ------------------------------------------------------------------------ */
 
-button,
-input,
-select,
-textarea {
-  font-family: inherit;
-  color: inherit;
-}
-
 /* iPhone Safari zooms into any field with text smaller than 16px. Never let that happen. */
 input,
 select,
 textarea {
   font-size: max(16px, 1em);
-}
-
-/* ---- Safe areas (notch, Dynamic Island, home indicator, landscape sides) --------------------
- * The --safe-* variables are defined in tokens.css (env(safe-area-inset-*)). Utility classes: */
-
-.safe-top {
-  padding-top: var(--safe-top);
-}
-.safe-bottom {
-  padding-bottom: var(--safe-bottom);
-}
-.safe-left {
-  padding-left: var(--safe-left);
-}
-.safe-right {
-  padding-right: var(--safe-right);
-}
-.safe-x {
-  padding-left: var(--safe-left);
-  padding-right: var(--safe-right);
-}
-.safe-all {
-  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
-}
-
-/* A scrolling content area inside the fixed shell: momentum scrolling, no scroll chaining to the page. */
-.scroll-area {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
 }

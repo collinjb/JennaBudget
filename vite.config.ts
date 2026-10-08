@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -12,11 +13,18 @@ function normalizeBase(value: string | undefined): string {
 // The URL must never change after install: the iPhone ties the home-screen app and its data to it.
 const base = normalizeBase(process.env.BASE_PATH);
 
+// Shown in Settings › About. package.json is the one place the version lives.
+const APP_VERSION = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string })
+  .version;
+
 // App background colors. Keep in sync with --bg in src/styles/tokens.css, index.html and scripts/generate-icons.mjs.
 const LIGHT_BG = '#f2f2f7';
 
 export default defineConfig({
   base,
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+  },
   plugins: [
     react(),
     // --- PWA section (owned by the iPhone & PWA agent) ---

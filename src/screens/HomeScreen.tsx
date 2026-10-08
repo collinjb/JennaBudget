@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { BigNumber } from '../components/BigNumber';
 import { Card } from '../components/Card';
 import { StackedBar, type Tone } from '../components/Charts';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -8,16 +7,18 @@ import { Money } from '../components/Money';
 import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatDate, formatDuration, formatMonth, monthKey } from '../lib/dates';
-import { interestWarnings, simulatePayoff } from '../lib/debt';
+import { interestWarnings } from '../lib/debt';
+import { projectGoal } from '../lib/goals';
 import { ceilDollars, formatMoney } from '../lib/money';
-import { paycheckPlan } from '../lib/schedule';
+import { paycheckPlan, type PaycheckWindow } from '../lib/schedule';
 import { buildSmartPlan } from '../lib/smartPlan';
 import { homeBreakdown, monthlySummary, type BreakdownKey } from '../lib/summary';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import { DEFAULT_SETTINGS, emptyBudget } from '../types';
-import { GoalStatusLine, goalProjection } from './goalStatus';
+import { GoalStatusLine } from './goalStatus';
 import { useNav } from './nav';
+import { InterestWarningNotice, ShortByNotice } from './notices';
 
 const PARTS: { key: BreakdownKey; label: string; tone: Tone }[] = [
   { key: 'bills', label: 'Bills', tone: 'bills' },
@@ -39,18 +40,11 @@ export function HomeScreen() {
   const windows = useMemo(() => paycheckPlan(data, today, 1), [data, today]);
   const plan = useMemo(() => buildSmartPlan(data, today), [data, today]);
   const activeDebts = useMemo(() => data.debts.filter((d) => d.balance > 0), [data.debts]);
-  const payoff = useMemo(
-    () =>
-      activeDebts.length > 0
-        ? simulatePayoff(activeDebts, {
-            method: data.settings.payoffMethod,
-            extra: summary.debtExtra,
-            startMonth: month,
-          })
-        : null,
-    [activeDebts, data.settings.payoffMethod, summary.debtExtra, month],
-  );
+  // The Smart Plan already simulated the payoff at the current pace ("before"); reuse it instead of running it again.
+  const payoff =
+    activeDebts.length > 0 ? { months: plan.impact.monthsBefore, debtFreeMonth: plan.impact.debtFreeBefore } : null;
   const warnings = useMemo(() => interestWarnings(activeDebts), [activeDebts]);
+  const goalRows = useMemo(() => data.goals.map((g) => ({ g, proj: projectGoal(g, today) })), [data.goals, today]);
 
   const hasIncome = data.incomes.length > 0;
   /** Set up a paycheck but no bills yet: nudge toward bills before anything else. */
@@ -68,12 +62,15 @@ export function HomeScreen() {
     actions.replaceAll({ ...emptyBudget(), settings: { ...DEFAULT_SETTINGS, theme: data.settings.theme } });
   };
 
-  const goals = data.goals;
-
   return (
     <div className="content stack home">
       <PageHeader
-        title={formatMonth(month, 'month')}
+        title={
+          <>
+            <span className="sr-only">Home: </span>
+            {formatMonth(month, 'month')}
+          </>
+        }
         subtitle="Here's your month at a glance."
         right={
           <button type="button" className="icon-btn" aria-label="Settings" onClick={() => nav.openPage('settings')}>
@@ -97,64 +94,49 @@ export function HomeScreen() {
         </div>
       )}
 
-      {/* 1. The big number */}
+      {/* 1. The big number. One live region that stays put, so a flip between "left" and "over" is announced. */}
       <section className={`card hero ${over ? 'hero--over' : 'hero--left'}`} aria-labelledby="hero-label">
-        {over ? (
-          <>
-            <p className="bignum__label hero__label--over" id="hero-label">
-              <IconWarning size={20} />
-              <span>Left over this month</span>
-            </p>
-            <p className="hero__over" aria-live="polite" aria-atomic="true">
+        <div className="bignum bignum--xl hero__live" aria-live="polite" aria-atomic="true">
+          <p className={`bignum__label${over ? ' hero__label--over' : ''}`} id="hero-label">
+            {over && <IconWarning size={20} />}
+            <span>Left over this month</span>
+          </p>
+          {over ? (
+            <p className="hero__over">
               {/* "$1,998 over" never splits across lines; "You're" wraps first on small phones. */}
               <span data-testid="left-over" data-cents={hb.leftOver}>
                 You're{' '}
                 <span className="hero__amount">{formatMoney(-hb.leftOver, { showCents: 'never' })} over</span>
               </span>
             </p>
-            {hasIncome ? (
-              <>
-                <p className="hero__note">You've planned more than you take home this month.</p>
-                <button type="button" className="link-btn hero__fix" onClick={() => nav.openPage('smartplan')}>
-                  Here's how to fix it <IconArrowRight size={18} />
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="hero__note">Add your take-home pay to see what's left after everything.</p>
-                <button type="button" className="btn btn--primary btn--block" onClick={() => nav.goTab('income', 'add')}>
-                  Add your paycheck
-                </button>
-              </>
-            )}
+          ) : (
+            <p className="bignum__value tone-left" data-testid="left-over" data-cents={hb.leftOver}>
+              {formatMoney(hb.leftOver, { showCents: 'never' })}
+            </p>
+          )}
+        </div>
+        {!hasIncome ? (
+          <>
+            <p className="hero__note">Add your take-home pay to see what's left after everything.</p>
+            <button type="button" className="btn btn--primary btn--block" onClick={() => nav.goTab('income', 'add')}>
+              Add your paycheck
+            </button>
+          </>
+        ) : over ? (
+          <>
+            <p className="hero__note">
+              Your bills, debt payments, savings, and spending add up to more than you take home this month.
+            </p>
+            <button type="button" className="link-btn hero__fix" onClick={() => nav.openPage('smartplan')}>
+              Here's how to fix it <IconArrowRight size={18} />
+            </button>
           </>
         ) : (
-          <>
-            <BigNumber
-              label={<span id="hero-label">Left over this month</span>}
-              tone="left"
-              size="xl"
-              live
-              testId="left-over"
-              cents={hb.leftOver}
-            >
-              {formatMoney(hb.leftOver, { showCents: 'never' })}
-            </BigNumber>
-            {hasIncome ? (
-              <p className="hero__note">
-                {hb.leftOver === 0
-                  ? 'Every dollar has a job. Nice!'
-                  : 'After bills, debt, savings, and spending. Yours to keep or use.'}
-              </p>
-            ) : (
-              <>
-                <p className="hero__note">Add your take-home pay to see what's left after everything.</p>
-                <button type="button" className="btn btn--primary btn--block" onClick={() => nav.goTab('income', 'add')}>
-                  Add your paycheck
-                </button>
-              </>
-            )}
-          </>
+          <p className="hero__note">
+            {hb.leftOver === 0
+              ? 'Every dollar has a job. Nice!'
+              : 'After bills, debt, savings, and spending. Yours to keep or use.'}
+          </p>
         )}
       </section>
 
@@ -176,12 +158,11 @@ export function HomeScreen() {
           <StackedBar
             segments={PARTS.filter((p) => p.key !== 'leftOver' || !over).map((p) => ({
               key: p.key,
-              label: p.label,
               value: partCents(p.key),
               tone: p.tone,
             }))}
           />
-          <ul className="legend">
+          <ul className="legend" role="list">
             {PARTS.map((p) => {
               if (p.key === 'leftOver' && over) {
                 return (
@@ -217,7 +198,7 @@ export function HomeScreen() {
 
       {/* 3. Next paycheck */}
       {hasIncome && windows.length > 0 ? (
-        <NextPaycheckCard window={windows[0]} onOpen={() => nav.openPage('paycheck')} />
+        <NextPaycheckCard paycheckWindow={windows[0]} onOpen={() => nav.openPage('paycheck')} />
       ) : null}
 
       {/* 4. Debt-free date */}
@@ -243,16 +224,13 @@ export function HomeScreen() {
               <span className="muted">(not within 50 years).</span>
             </p>
           )}
-          {warnings.map((w) => (
-            <p key={w.debtId} className="notice notice--warn home-warn">
-              <IconWarning size={18} />
-              <span>
-                <strong>{w.name}:</strong> Your {formatMoney(w.minPayment)} payment doesn't cover the{' '}
-                {formatMoney(w.monthlyInterest)} of interest each month, so this balance will keep growing.
-                {payoff.months !== null && ' Your plan still pays it off later, once extra money goes to it.'}
-              </span>
-            </p>
-          ))}
+          {warnings.length > 0 && (
+            <div className="home-warn stack stack--sm">
+              {warnings.map((w) => (
+                <InterestWarningNotice key={w.debtId} warning={w} paysOffLater={payoff.months !== null} />
+              ))}
+            </div>
+          )}
         </Card>
       )}
 
@@ -271,7 +249,7 @@ export function HomeScreen() {
                 <h2 className="card__title">Your bills are more than your income</h2>
               </div>
               <p className="muted small">
-                Even before savings and fun, your bills, minimum debt payments, and must-have spending cost{' '}
+                Even before savings and fun, your bills, minimum debt payments, and must-have spending cost about{' '}
                 <strong>
                   {/* Round up so a shortfall of a few cents never reads "$0 more". */}
                   <Money cents={ceilDollars(plan.shortfall)} showCents="never" /> more
@@ -325,11 +303,10 @@ export function HomeScreen() {
       )}
 
       {/* 6. Savings goals */}
-      {goals.length > 0 && (
+      {goalRows.length > 0 && (
         <Card title="Savings goals" action={{ label: 'See all savings', onClick: () => nav.goTab('savings') }}>
-          <ul className="home-goals">
-            {goals.map((g) => {
-              const proj = goalProjection(g, today);
+          <ul className="home-goals" role="list">
+            {goalRows.map(({ g, proj }) => {
               return (
                 <li key={g.id} className="home-goal">
                   <div className="home-goal__top">
@@ -364,13 +341,7 @@ export function HomeScreen() {
   );
 }
 
-function NextPaycheckCard({
-  window: w,
-  onOpen,
-}: {
-  window: ReturnType<typeof paycheckPlan>[number];
-  onOpen: () => void;
-}) {
+function NextPaycheckCard({ paycheckWindow: w, onOpen }: { paycheckWindow: PaycheckWindow; onOpen: () => void }) {
   const shown = w.items.slice(0, 4);
   const more = w.items.length - shown.length;
   return (
@@ -388,7 +359,7 @@ function NextPaycheckCard({
       {w.items.length > 0 ? (
         <>
           <p className="muted small payday-card__due">Due before the next payday ({formatDate(w.end, 'short')}):</p>
-          <ul className="mini-list">
+          <ul className="mini-list" role="list">
             {shown.map((it) => (
               <li key={`${it.kind}-${it.id}-${it.date}`} className="mini-list__row">
                 <span className="mini-list__name ellipsis">
@@ -405,12 +376,7 @@ function NextPaycheckCard({
         <p className="muted small payday-card__due">Nothing is due before the next payday.</p>
       )}
       {w.shortBy > 0 ? (
-        <p className="notice notice--over payday-card__result">
-          <span>
-            ⚠️ This paycheck is short by <strong><Money cents={w.shortBy} /></strong>. Set aside{' '}
-            <Money cents={w.shortBy} /> from the paycheck before.
-          </span>
-        </p>
+        <ShortByNotice shortBy={w.shortBy} className="payday-card__result" />
       ) : (
         <p className="payday-card__left">
           <strong className="tone-left">

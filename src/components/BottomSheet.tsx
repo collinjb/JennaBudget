@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { announce } from './announce';
+import { historyState, isSilentPop, silentBack } from './history';
 import { prefersReducedMotion, useModalLayer } from './modal';
 
 interface BottomSheetProps {
   title: string;
-  /** Called once the sheet has finished sliding away (Cancel, Escape, backdrop, or a successful Save). */
+  /** Called once the sheet has finished sliding away (Cancel, Escape, Back, backdrop, or a successful Save). */
   onClose: () => void;
   /** Save handler. Return false to keep the sheet open (e.g. a field has an error). */
   onSave?: () => boolean | void;
@@ -20,11 +22,15 @@ interface BottomSheetProps {
 }
 
 const TEXT_INPUT = 'input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select';
+/** history.state key marking the entry a sheet adds, so Back / swipe-back closes the sheet. */
+const SHEET_STATE_KEY = 'budgetSheet';
 
 /**
  * iOS-style bottom sheet: Cancel · Title · Save header, scrolling body, big Save button at the bottom.
  * Stays usable with the iPhone keyboard open: the sheet is sized to the *visual* viewport, so the
- * header Save never hides behind the keyboard, and the focused field is scrolled into view.
+ * header Save never hides behind the keyboard, and the focused field is scrolled into view whenever
+ * the space for the body actually changes (the keyboard often finishes opening well after the focus).
+ * Back / swipe-back closes the sheet (it adds a history entry while open).
  */
 export function BottomSheet({
   title,
@@ -45,57 +51,110 @@ export function BottomSheet({
   const busy = useRef(false);
   const [closing, setClosing] = useState(false);
   const titleId = useId();
+  const sheetKey = useId();
+  const pushed = useRef(false);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
   });
 
-  const close = () => {
+  const close = (fromHistory = false) => {
     if (busy.current) return;
     busy.current = true;
+    // Take our history entry back off (unless Back already did).
+    if (!fromHistory && historyState()[SHEET_STATE_KEY] === sheetKey) silentBack();
     setClosing(true);
     timer.current = window.setTimeout(() => onCloseRef.current(), prefersReducedMotion() ? 0 : 230);
   };
+  const closeRef = useRef(close);
+  useEffect(() => {
+    closeRef.current = close;
+  });
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  useModalLayer(panelRef, close);
+  // Back / swipe-back closes the sheet instead of leaving the screen.
+  useEffect(() => {
+    if (!pushed.current) {
+      pushed.current = true;
+      window.history.pushState({ ...historyState(), [SHEET_STATE_KEY]: sheetKey }, '');
+    }
+    const onPop = () => {
+      if (isSilentPop() || historyState()[SHEET_STATE_KEY] === sheetKey) return;
+      closeRef.current(true);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [sheetKey]);
 
-  // Keep the sheet inside the visible area when the on-screen keyboard opens (iOS doesn't resize the layout).
+  useModalLayer(panelRef, () => close());
+
+  // Keep the sheet inside the visible area when the on-screen keyboard opens (iOS doesn't resize the layout),
+  // and keep the focused field visible whenever the body's size changes.
   useEffect(() => {
     const vv = window.visualViewport;
     const overlay = overlayRef.current;
-    if (!vv || !overlay) return;
+    const body = bodyRef.current;
+    if (!overlay || !body) return;
     let raf = 0;
+    let raf2 = 0;
     const keepFocusedVisible = () => {
       const active = document.activeElement;
-      const body = bodyRef.current;
-      if (!(active instanceof HTMLElement) || !body || !body.contains(active) || !active.matches(TEXT_INPUT)) return;
+      if (!(active instanceof HTMLElement) || !body.contains(active) || !active.matches(TEXT_INPUT)) return;
       const field = (active.closest('.field, .seg-field, .choices') as HTMLElement | null) ?? active;
       const b = body.getBoundingClientRect();
       const f = field.getBoundingClientRect();
+      if (b.height <= 0) return;
       if (f.top < b.top + 8) body.scrollTop -= b.top + 8 - f.top;
       else if (f.bottom > b.bottom - 8) body.scrollTop += Math.min(f.bottom - (b.bottom - 8), f.top - (b.top + 8));
     };
+    /** Measure after layout has caught up (two frames: the resize lands in the first, layout in the next). */
+    const keepVisibleSoon = () => {
+      cancelAnimationFrame(raf2);
+      raf2 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(keepFocusedVisible);
+      });
+    };
     const update = () => {
+      if (!vv) return;
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const keyboard = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
         overlay.style.top = `${vv.offsetTop}px`;
         overlay.style.height = `${vv.height}px`;
         overlay.classList.toggle('kb-open', keyboard > 80);
-        keepFocusedVisible();
+        keepVisibleSoon();
       });
     };
     update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    const onFocusIn = () => window.setTimeout(keepFocusedVisible, 320);
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    // Whenever the body really gets smaller or bigger (keyboard, helper text, errors), re-check the focused field.
+    let lastHeight = body.clientHeight;
+    const ro =
+      typeof ResizeObserver === 'function'
+        ? new ResizeObserver(() => {
+            const h = body.clientHeight;
+            if (h === lastHeight) return;
+            lastHeight = h;
+            keepVisibleSoon();
+          })
+        : null;
+    ro?.observe(body);
+    const focusTimers: number[] = [];
+    const onFocusIn = () => {
+      keepVisibleSoon();
+      // Belt and braces for slow keyboards that resize without a visualViewport event.
+      focusTimers.push(window.setTimeout(keepFocusedVisible, 320), window.setTimeout(keepFocusedVisible, 700));
+    };
     overlay.addEventListener('focusin', onFocusIn);
     return () => {
       cancelAnimationFrame(raf);
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
+      cancelAnimationFrame(raf2);
+      focusTimers.forEach((t) => window.clearTimeout(t));
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+      ro?.disconnect();
       overlay.removeEventListener('focusin', onFocusIn);
     };
   }, []);
@@ -104,11 +163,16 @@ export function BottomSheet({
     if (busy.current || !onSave) return;
     const ok = onSave();
     if (ok === false) {
-      // Bring the first error into view.
+      // Bring the first error into view; its message is read with the field (aria-describedby).
       window.setTimeout(() => {
-        const err = bodyRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+        const invalid = bodyRef.current?.querySelectorAll<HTMLElement>('[aria-invalid="true"]') ?? [];
+        const err = invalid[0];
         err?.focus({ preventScroll: true });
-        err?.closest('.field')?.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+        err?.closest('.field, .field-group')?.scrollIntoView({
+          block: 'center',
+          behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        });
+        announce(invalid.length > 1 ? `${invalid.length} fields need a fix.` : 'Please check the highlighted field.');
       }, 0);
       return;
     }
@@ -132,7 +196,7 @@ export function BottomSheet({
 
   return createPortal(
     <div ref={overlayRef} className={`sheet-overlay${closing ? ' is-closing' : ''}`}>
-      <div className="sheet-backdrop" onClick={close} aria-hidden="true" />
+      <div className="sheet-backdrop" onClick={() => close()} aria-hidden="true" />
       <div
         ref={panelRef}
         className="sheet"
@@ -144,7 +208,7 @@ export function BottomSheet({
       >
         <div className="sheet__grabber" aria-hidden="true" />
         <div className="sheet__header">
-          <button type="button" className="sheet__hbtn" onClick={close}>
+          <button type="button" className="sheet__hbtn" onClick={() => close()}>
             {cancelLabel}
           </button>
           <h2 className="sheet__title" id={titleId}>

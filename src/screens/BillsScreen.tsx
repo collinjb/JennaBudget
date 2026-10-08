@@ -12,7 +12,7 @@ import { Money } from '../components/Money';
 import { MoneyInput, useMoneyField } from '../components/MoneyInput';
 import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
-import { Select, type Option } from '../components/Select';
+import { Select } from '../components/Select';
 import { addDays, dateInMonth, formatDate, formatMonth, isoParts, monthKey } from '../lib/dates';
 import { billMonthly, FREQUENCY_SUFFIX, isApproxMonthly, toMonthly } from '../lib/frequency';
 import { newId } from '../lib/ids';
@@ -24,15 +24,10 @@ import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import type { Bill, BillFrequency, ISODate } from '../types';
 import { useNav } from './nav';
-import { plural, useDeleteWithUndo } from './shared';
+import { freqText, frequencyOptions, plural, useDeleteWithUndo } from './shared';
 
-export const BILL_FREQ_OPTIONS: Option<BillFrequency>[] = [
-  { value: 'monthly', label: 'Every month' },
-  { value: 'weekly', label: 'Every week' },
-  { value: 'biweekly', label: 'Every 2 weeks' },
-  { value: 'quarterly', label: 'Every 3 months' },
-  { value: 'yearly', label: 'Once a year' },
-];
+export const BILL_FREQUENCIES: BillFrequency[] = ['monthly', 'weekly', 'biweekly', 'quarterly', 'yearly'];
+export const BILL_FREQ_OPTIONS = frequencyOptions(BILL_FREQUENCIES);
 
 export function BillsScreen() {
   const { data, actions } = useBudget();
@@ -51,7 +46,7 @@ export function BillsScreen() {
     bm.dueCount === 0
       ? 'No bills are due this month.'
       : bm.paidCount === bm.dueCount
-        ? `All ${plural(bm.dueCount, 'bill')} paid this month 🎉`
+        ? `All ${plural(bm.dueCount, 'bill')} paid this month`
         : `${bm.paidCount} of ${plural(bm.dueCount, 'bill')} paid · ${formatMoney(bm.leftToPay)} to go`;
 
   return (
@@ -79,6 +74,7 @@ export function BillsScreen() {
             <div className="bills-progress">
               <p className="bills-progress__text" data-testid="bills-progress">
                 {progressText}
+                {bm.dueCount > 0 && bm.paidCount === bm.dueCount && <span aria-hidden="true"> 🎉</span>}
               </p>
               {bm.dueCount > 0 && (
                 <ProgressBar
@@ -97,7 +93,7 @@ export function BillsScreen() {
                 <h2 className="section-title">Due in {formatMonth(month, 'month')}</h2>
                 <span className="section-head__aside">Check off when paid</span>
               </div>
-              <ul className="list">
+              <ul className="list" role="list">
                 {due.map((s) => (
                   <BillRow
                     key={s.bill.id}
@@ -114,7 +110,7 @@ export function BillsScreen() {
           {notDue.length > 0 && (
             <>
               <h2 className="section-title">Not due this month</h2>
-              <ul className="list">
+              <ul className="list" role="list">
                 {notDue.map((s) => (
                   <BillRow key={s.bill.id} s={s} today={today} onEdit={() => setSheet({ bill: s.bill })} />
                 ))}
@@ -142,6 +138,7 @@ function BillRow({
 }) {
   const b = s.bill;
   const monthly = b.frequency === 'monthly';
+  const monthlyCents = billMonthly(b);
   let when: string;
   if (s.dueThisMonth) {
     const first = s.dueDates[0];
@@ -153,7 +150,14 @@ function BillRow({
   return (
     <li>
       <div className={`row row--split${s.paid ? ' row--done' : ''}`}>
-        <button type="button" className="row__tap" onClick={onEdit} aria-label={`${b.name}, ${formatMoney(b.amount)}, ${when}. Edit`}>
+        <button
+          type="button"
+          className="row__tap"
+          onClick={onEdit}
+          aria-label={`${b.name}, ${formatMoney(b.amount)}, ${when}${
+            monthly ? '' : `, ${freqText(b.frequency)}, about ${formatMoney(monthlyCents)} a month`
+          }. Edit`}
+        >
           <span className="row__icon" aria-hidden="true">
             {b.emoji}
           </span>
@@ -170,8 +174,8 @@ function BillRow({
             </span>
             {!monthly && (
               <span className="row__amount-sub">
-                <Money cents={billMonthly(b)} approx />
-                /mo
+                <Money cents={monthlyCents} approx />
+                {FREQUENCY_SUFFIX.monthly}
               </span>
             )}
           </span>
@@ -198,7 +202,7 @@ export function BillSheet({ bill, today, onClose }: { bill: Bill | null; today: 
   const peek = amount.peek();
   const monthlyHint =
     freq !== 'monthly' && peek !== null && peek > 0
-      ? `${formatMoney(peek)}${FREQUENCY_SUFFIX[freq]} ≈ ${formatMoney(toMonthly(peek, freq))}/mo`
+      ? `${formatMoney(peek)}${FREQUENCY_SUFFIX[freq]} ≈ ${formatMoney(toMonthly(peek, freq))}${FREQUENCY_SUFFIX.monthly}`
       : undefined;
 
   const save = () => {

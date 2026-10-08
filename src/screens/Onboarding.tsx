@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Chip, ChipRow } from '../components/Chip';
-import { DateInput, DayPicker, isUsableDate } from '../components/DateInput';
+import { announce } from '../components/announce';
+import { DateInput, DayPairField, DayPicker, isUsableDate, semimonthlyDaysError } from '../components/DateInput';
 import { TextField, cleanName } from '../components/Field';
 import { IconChevronLeft, IconClose } from '../components/Icons';
 import { MoneyInput, checkMoney } from '../components/MoneyInput';
@@ -8,6 +9,7 @@ import { RateInput } from '../components/RateInput';
 import { ChoiceList } from '../components/Select';
 import { dateInMonth, isoParts } from '../lib/dates';
 import { makeExampleBudget } from '../lib/exampleData';
+import { FREQUENCY_LABELS } from '../lib/frequency';
 import { newId } from '../lib/ids';
 import { parseRate } from '../lib/money';
 import { BILL_PRESETS, DEBT_PRESETS, DEBT_TYPE_INFO, GOAL_PRESETS, SPENDING_PRESETS } from '../lib/presets';
@@ -57,14 +59,21 @@ interface WantRow {
   monthly: string;
 }
 
-const FREQ_CHOICES: { value: IncomeFrequency; label: string; hint: string }[] = [
-  { value: 'weekly', label: 'Every week', hint: 'Same day every week' },
-  { value: 'biweekly', label: 'Every 2 weeks', hint: 'Like every other Friday' },
-  { value: 'semimonthly', label: 'Twice a month', hint: 'Like the 1st and the 15th' },
-  { value: 'monthly', label: 'Once a month', hint: 'Same date every month' },
-];
+const FREQ_HINTS: Record<IncomeFrequency, string> = {
+  weekly: 'Same day every week',
+  biweekly: 'Like every other Friday',
+  semimonthly: 'Like the 1st and the 15th',
+  monthly: 'Same date every month',
+};
+const FREQ_CHOICES = (Object.keys(FREQ_HINTS) as IncomeFrequency[]).map((value) => ({
+  value,
+  label: FREQUENCY_LABELS[value],
+  hint: FREQ_HINTS[value],
+}));
 
 const STEPS = 4;
+/** Taps on Next/Skip/Back right after a step changes are ignored (a double tap must not skip a step). */
+const STEP_SETTLE_MS = 350;
 
 let rowCounter = 0;
 const rowKey = () => `r${++rowCounter}`;
@@ -93,6 +102,17 @@ export function Onboarding() {
     if (step > 0) headingRef.current?.focus({ preventScroll: true });
   }, [step]);
 
+  // Double-tap guard: for a moment after a step change the step buttons are "busy" (aria-disabled, taps ignored).
+  const [settling, setSettling] = useState(false);
+  const settleTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(settleTimer.current), []);
+  const goStep = (n: number) => {
+    setStep(n);
+    setSettling(true);
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => setSettling(false), STEP_SETTLE_MS);
+  };
+
   const setErr = (k: string, v: string | null) => setErrors((e) => ({ ...e, [k]: v }));
 
   // ---------- validation per step ----------
@@ -105,11 +125,12 @@ export function Onboarding() {
         if (r.error) next.pay = r.error;
       }
       if (freq !== 'semimonthly' && !isUsableDate(payDate)) next.payDate = 'Please pick your next payday.';
-      if (freq === 'semimonthly' && days[0] === days[1]) next.days = 'Please pick two different days.';
+      if (freq === 'semimonthly') next.days = semimonthlyDaysError(days);
     }
     if (s === 2) {
       for (const b of bills) {
-        const r = checkMoney(b.amount, { required: true });
+        // Same rule as the bill form: a bill needs an amount above $0.
+        const r = checkMoney(b.amount, { required: true, allowZero: false });
         if (r.error) next[`bill-${b.key}`] = r.error;
       }
     }
@@ -136,15 +157,17 @@ export function Onboarding() {
       }
     }
     setErrors(next);
-    const ok = Object.values(next).every((v) => !v);
-    if (!ok) {
+    const problems = Object.values(next).filter(Boolean).length;
+    if (problems > 0) {
+      // Focus the first problem (its message is read with it) and say once that something needs a fix.
       window.setTimeout(() => {
         const el = scrollRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
         el?.focus();
-        el?.closest('.field')?.scrollIntoView({ block: 'center' });
+        el?.closest('.field, .field-group')?.scrollIntoView({ block: 'center' });
+        announce(problems > 1 ? `${problems} fields need a fix.` : 'Please check the highlighted field.');
       }, 0);
     }
-    return ok;
+    return problems === 0;
   };
 
   // ---------- finish ----------
@@ -173,7 +196,7 @@ export function Onboarding() {
     }
     if (!opts.skipBills) {
       for (const b of bills) {
-        const c = checkMoney(b.amount, { required: true }).cents;
+        const c = checkMoney(b.amount, { required: true, allowZero: false }).cents;
         if (c === null) continue;
         out.bills.push({
           id: newId(),
@@ -228,12 +251,13 @@ export function Onboarding() {
   };
 
   const next = () => {
-    if (!validate(step)) return;
+    if (settling || !validate(step)) return;
     if (step === STEPS) finish();
-    else setStep(step + 1);
+    else goStep(step + 1);
   };
 
   const skip = () => {
+    if (settling) return;
     setErrors({});
     if (step === 1) setPay('');
     if (step === 2) setBills([]);
@@ -242,7 +266,11 @@ export function Onboarding() {
       finish({ skipWants: true });
       return;
     }
-    setStep(step + 1);
+    goStep(step + 1);
+  };
+
+  const backStep = () => {
+    if (!settling) goStep(step - 1);
   };
 
   const lookAround = () => {
@@ -269,13 +297,13 @@ export function Onboarding() {
 
   if (step === 0) {
     return (
-      <div className="app onb onb--welcome">
+      <main className="app onb onb--welcome">
         <div className="onb__scroll" ref={scrollRef}>
           <div className="onb__welcome">
             {/* The same icon as on the home screen, so the app feels like one thing. */}
             <img
               className="onb__logo"
-              src={`${import.meta.env.BASE_URL}pwa-512x512.png`}
+              src={`${import.meta.env.BASE_URL}favicon.svg`}
               alt=""
               width={104}
               height={104}
@@ -285,7 +313,7 @@ export function Onboarding() {
             <p className="onb__lead onb__lead--center">
               See where your money goes and how much is left, all in one simple place. Everything stays on your phone.
             </p>
-            <ul className="onb__perks">
+            <ul className="onb__perks" role="list">
               <li>
                 <span aria-hidden="true">💵</span> Add your pay
               </li>
@@ -299,7 +327,7 @@ export function Onboarding() {
           </div>
         </div>
         <div className="onb__footer">
-          <button type="button" className="btn btn--primary btn--block btn--lg" onClick={() => setStep(1)}>
+          <button type="button" className="btn btn--primary btn--block btn--lg" onClick={() => goStep(1)}>
             Let's get started
           </button>
           <button type="button" className="btn btn--plain btn--block" onClick={lookAround}>
@@ -310,7 +338,7 @@ export function Onboarding() {
           </button>
           {restore.input}
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -328,9 +356,9 @@ export function Onboarding() {
   };
 
   return (
-    <div className="app onb">
+    <main className="app onb">
       <div className="onb__top">
-        <button type="button" className="back-btn" onClick={() => setStep(step - 1)}>
+        <button type="button" className="back-btn" onClick={backStep} aria-disabled={settling || undefined}>
           <IconChevronLeft size={22} />
           <span>Back</span>
         </button>
@@ -339,7 +367,7 @@ export function Onboarding() {
             <span key={i} className={`onb__dot${i + 1 === step ? ' is-current' : i + 1 < step ? ' is-done' : ''}`} />
           ))}
         </div>
-        <button type="button" className="onb__skip" onClick={skip}>
+        <button type="button" className="onb__skip" onClick={skip} aria-disabled={settling || undefined}>
           Skip
         </button>
       </div>
@@ -369,33 +397,14 @@ export function Onboarding() {
               />
               <ChoiceList label="How often do you get paid?" value={freq} options={FREQ_CHOICES} onChange={setFreq} />
               {freq === 'semimonthly' ? (
-                <>
-                  <div className="field-row">
-                    <DayPicker
-                      label="First payday"
-                      lastDayLabel="last day"
-                      value={days[0]}
-                      onChange={(d) => {
-                        setDays([d, days[1]]);
-                        setErr('days', null);
-                      }}
-                    />
-                    <DayPicker
-                      label="Second payday"
-                      lastDayLabel="last day"
-                      value={days[1]}
-                      onChange={(d) => {
-                        setDays([days[0], d]);
-                        setErr('days', null);
-                      }}
-                    />
-                  </div>
-                  {errors.days && (
-                    <p className="field__error" role="alert">
-                      {errors.days}
-                    </p>
-                  )}
-                </>
+                <DayPairField
+                  days={days}
+                  error={errors.days}
+                  onChange={(d) => {
+                    setDays(d);
+                    setErr('days', null);
+                  }}
+                />
               ) : (
                 <DateInput
                   label="When is your next payday?"
@@ -432,7 +441,7 @@ export function Onboarding() {
                 />
               </ChipRow>
               {bills.map((b) => (
-                <div key={b.key} className="onb-row card">
+                <RowCard key={b.key} legend={b.custom ? b.name || 'New bill' : b.name}>
                   <RowHead
                     emoji={b.emoji}
                     name={b.custom ? null : b.name}
@@ -464,7 +473,7 @@ export function Onboarding() {
                       onChange={(d) => setBills(bills.map((x) => (x.key === b.key ? { ...x, dueDay: d } : x)))}
                     />
                   </div>
-                </div>
+                </RowCard>
               ))}
             </div>
           )}
@@ -496,17 +505,19 @@ export function Onboarding() {
                 <button
                   type="button"
                   className="btn btn--secondary btn--block btn--lg"
+                  aria-disabled={settling || undefined}
                   onClick={() => {
+                    if (settling) return;
                     setDebts([]);
                     setErrors({});
-                    setStep(4);
+                    goStep(4);
                   }}
                 >
-                  No debt 🎉
+                  No debt<span aria-hidden="true"> 🎉</span>
                 </button>
               )}
               {debts.map((d) => (
-                <div key={d.key} className="onb-row card">
+                <RowCard key={d.key} legend={d.custom ? d.name || 'New debt' : d.name}>
                   <RowHead
                     emoji={DEBT_TYPE_INFO[d.type].emoji}
                     name={d.custom ? null : d.name}
@@ -557,7 +568,7 @@ export function Onboarding() {
                     value={d.dueDay}
                     onChange={(n) => setDebts(debts.map((x) => (x.key === d.key ? { ...x, dueDay: n } : x)))}
                   />
-                </div>
+                </RowCard>
               ))}
             </div>
           )}
@@ -589,7 +600,7 @@ export function Onboarding() {
                 ))}
               </ChipRow>
               {wants.map((w) => (
-                <div key={w.key} className="onb-row card">
+                <RowCard key={w.key} legend={w.name}>
                   <RowHead
                     emoji={w.emoji}
                     name={w.name}
@@ -618,7 +629,7 @@ export function Onboarding() {
                       helper="Optional. Not sure? Leave it blank and the Smart Plan will suggest an amount."
                     />
                   )}
-                </div>
+                </RowCard>
               ))}
             </div>
           )}
@@ -626,11 +637,32 @@ export function Onboarding() {
       </div>
 
       <div className="onb__footer">
-        <button type="button" className="btn btn--primary btn--block btn--lg" onClick={next}>
+        <button
+          type="button"
+          className="btn btn--primary btn--block btn--lg"
+          onClick={next}
+          aria-disabled={settling || undefined}
+        >
           {step === STEPS ? 'Finish' : 'Next'}
         </button>
       </div>
-    </div>
+    </main>
+  );
+}
+
+/**
+ * One item's card (a bill, debt, or goal). A fieldset named after the item, so "Amount" and "Due on" are heard as
+ * "Rent, Amount" rather than a list of identical labels.
+ */
+function RowCard({ legend, children }: { legend: string; children: ReactNode }) {
+  const id = useId();
+  return (
+    <fieldset className="onb-row card" aria-labelledby={id}>
+      <legend className="sr-only" id={id}>
+        {legend}
+      </legend>
+      {children}
+    </fieldset>
   );
 }
 

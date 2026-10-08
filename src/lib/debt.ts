@@ -1,6 +1,7 @@
 import type { Cents, Debt, MonthKey, PayoffMethod } from '../types';
 import { addMonthsToKey } from './dates';
 import { roundDiv } from './money';
+import { compareText } from './text';
 
 export const MAX_PAYOFF_MONTHS = 600;
 
@@ -57,10 +58,6 @@ export function payoffOrder(debts: Debt[], method: PayoffMethod): Debt[] {
   return active.sort((a, b) => b.rateBps - a.rateBps || a.balance - b.balance || byName(a, b));
 }
 
-function compareText(a: string, b: string): number {
-  return a.localeCompare(b, 'en-US', { sensitivity: 'base' }) || (a < b ? -1 : a > b ? 1 : 0);
-}
-
 /** One month of interest: round-half-up(balance × rateBps / 120000). */
 export function monthlyInterest(balance: Cents, rateBps: number): Cents {
   if (!(balance > 0) || !(rateBps > 0)) return 0;
@@ -80,7 +77,7 @@ export function simulatePayoff(debts: Debt[], opts: PayoffOptions): PayoffResult
   const maxMonths = Math.max(0, Math.floor(opts.maxMonths ?? MAX_PAYOFF_MONTHS));
   const order = payoffOrder(debts, opts.method);
   const extra = Math.max(0, opts.extra);
-  const monthlyBudget = order.reduce((s, d) => s + minimumFor(d, d.balance), 0) + extra;
+  const monthlyBudget = order.reduce((s, d) => s + minimumDue(d.minPayment, d.balance), 0) + extra;
 
   const balances = order.map((d) => d.balance);
   const interestPaid = order.map(() => 0);
@@ -105,7 +102,7 @@ export function simulatePayoff(debts: Debt[], opts: PayoffOptions): PayoffResult
     // 3) Minimums (never more than what's owed, never more than what's in the pool).
     for (let i = 0; i < order.length && pool > 0; i++) {
       if (balances[i] <= 0) continue;
-      const pay = Math.min(minimumFor(order[i], balances[i]), pool);
+      const pay = Math.min(minimumDue(order[i].minPayment, balances[i]), pool);
       balances[i] -= pay;
       pool -= pay;
       totalPaid += pay;
@@ -153,27 +150,45 @@ export function simulatePayoff(debts: Debt[], opts: PayoffOptions): PayoffResult
   };
 }
 
-/** The minimum payment that applies to a balance: min(minPayment, balance), never negative. */
-function minimumFor(d: Debt, balance: Cents): Cents {
-  return Math.max(0, Math.min(d.minPayment, balance));
+/**
+ * The minimum payment that applies to a balance: min(minPayment, balance), never negative.
+ * The one place this rule lives (monthly summary, payoff simulation and Paycheck Plan all use it).
+ */
+export function minimumDue(minPayment: Cents, balance: Cents): Cents {
+  return Math.max(0, Math.min(minPayment, balance));
 }
+
+/**
+ * Why a debt never gets paid off on its own:
+ * - 'grows': the minimum is less than a month of interest, so the balance keeps growing;
+ * - 'flat': the minimum exactly equals the interest, so the balance never goes down;
+ * - 'no-payment': there is no minimum payment at all (any rate, including 0%).
+ */
+export type InterestWarningKind = 'grows' | 'flat' | 'no-payment';
 
 export interface InterestWarning {
   debtId: string;
   name: string;
+  kind: InterestWarningKind;
   monthlyInterest: Cents;
   minPayment: Cents;
 }
 
-/** Debts (balance > 0, rate > 0) whose minPayment <= their first month of interest: they'd never shrink on their own. */
+/**
+ * Debts with a balance that would never shrink on their own (see InterestWarningKind), in the order given.
+ * A debt with no minimum payment is 'no-payment' whatever its rate; otherwise minPayment < interest is 'grows' and
+ * minPayment === interest is 'flat'. Debts whose minimum beats the interest (or 0% debts with a minimum) aren't listed.
+ */
 export function interestWarnings(debts: Debt[]): InterestWarning[] {
   const out: InterestWarning[] = [];
   for (const d of debts) {
-    if (!(d.balance > 0) || !(d.rateBps > 0)) continue;
+    if (!(d.balance > 0)) continue;
     const interest = monthlyInterest(d.balance, d.rateBps);
-    if (d.minPayment <= interest) {
-      out.push({ debtId: d.id, name: d.name, monthlyInterest: interest, minPayment: d.minPayment });
-    }
+    let kind: InterestWarningKind | null = null;
+    if (!(d.minPayment > 0)) kind = 'no-payment';
+    else if (d.minPayment < interest) kind = 'grows';
+    else if (d.minPayment === interest) kind = 'flat';
+    if (kind) out.push({ debtId: d.id, name: d.name, kind, monthlyInterest: interest, minPayment: d.minPayment });
   }
   return out;
 }
@@ -196,6 +211,11 @@ export function compareExtra(
 ): ExtraComparison {
   const base = simulatePayoff(debts, { method, extra: baseExtra, startMonth });
   const withExtra = simulatePayoff(debts, { method, extra: newExtra, startMonth });
+  return comparePayoffs(base, withExtra);
+}
+
+/** Compare two payoff results that were already simulated (lets a slider reuse the unchanged "base" run). */
+export function comparePayoffs(base: PayoffResult, withExtra: PayoffResult): ExtraComparison {
   const monthsSooner = base.months !== null && withExtra.months !== null ? base.months - withExtra.months : null;
   return {
     base,

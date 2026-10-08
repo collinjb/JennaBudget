@@ -9,7 +9,6 @@ interface ChipProps {
   selected?: boolean;
   /** Show a small "+" when the chip adds something. */
   adds?: boolean;
-  children?: ReactNode;
 }
 
 /** Pill-shaped quick-pick button, at least 44px tall. */

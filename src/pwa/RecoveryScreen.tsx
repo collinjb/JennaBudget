@@ -1,8 +1,15 @@
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useBudget } from '../state/store';
-import { loadPreviousData, parseBackup, type BackupSummary } from '../storage/storage';
+import {
+  formatExportedAt,
+  loadPreviousData,
+  markOnboardedIfFilled,
+  parseBackup,
+  type BackupSummary,
+} from '../storage/storage';
 import type { BudgetData } from '../types';
 import { saveCopyMessage, saveCopyOfData } from './saveCopy';
+import { reloadToLatest } from './sw';
 import './pwa.css';
 
 /** Largest file we'll try to read (a real backup is a few KB). */
@@ -34,26 +41,35 @@ function countsOf(d: BudgetData): Omit<BackupSummary, 'exportedAt'> {
   };
 }
 
-/** "Oct 3, 2026" from a backup's ISO timestamp (null if missing or unreadable). */
-function formatExportedAt(iso: string | null): string | null {
-  if (!iso) return null;
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return null;
-  return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
 /**
  * Shown instead of the app when saved data can't be read (useBudget().status === 'corrupt').
  * Nothing is overwritten until the user picks one of the options.
  */
 export function RecoveryScreen() {
-  const { corruptRaw, actions } = useBudget();
+  const { corruptRaw, corruptError, actions } = useBudget();
   const [previous] = useState(() => loadPreviousData());
   const [picked, setPicked] = useState<{ data: BudgetData; summary: BackupSummary } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [confirmFresh, setConfirmFresh] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
+  // Data saved by a newer version of the app isn't damaged: updating the app is the real fix.
+  const newerVersion = !!corruptError && /newer version/i.test(corruptError);
+
+  // The "Erase everything?" question takes focus when it appears, so it's read right away.
+  useEffect(() => {
+    if (confirmFresh) confirmRef.current?.focus();
+  }, [confirmFresh]);
+
+  /** Restored data that has anything in it counts as set up (so onboarding can't show over it). */
+  const restore = (d: BudgetData) => actions.replaceAll(markOnboardedIfFilled(d));
+
+  const checkForUpdate = () => {
+    setUpdating(true);
+    void reloadToLatest();
+  };
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
@@ -96,11 +112,27 @@ export function RecoveryScreen() {
             🧰
           </div>
           <h1 className="pwa-title">We couldn't open your budget</h1>
-          <p className="pwa-text">
-            Your saved budget couldn't be read. This can happen after a storage problem on the phone. Nothing has
-            been erased. Choose what you'd like to do:
-          </p>
+          {newerVersion ? (
+            <p className="pwa-text">{corruptError} Nothing has been erased.</p>
+          ) : (
+            <p className="pwa-text">
+              Your saved budget couldn't be read. This can happen after a storage problem on the phone. Nothing has
+              been erased. Choose what you'd like to do:
+            </p>
+          )}
         </header>
+
+        {newerVersion && (
+          <section className="pwa-card" aria-labelledby="pwa-rec-update">
+            <h2 className="pwa-card__title" id="pwa-rec-update">
+              Get the newest version
+            </h2>
+            <p className="pwa-text">Make sure you're online, then check for an update. Your budget stays as it is.</p>
+            <button type="button" className="pwa-btn pwa-btn--primary" onClick={checkForUpdate} disabled={updating}>
+              {updating ? 'Checking…' : 'Check for an update'}
+            </button>
+          </section>
+        )}
 
         {previous && (
           <section className="pwa-card" aria-labelledby="pwa-rec-prev">
@@ -110,7 +142,11 @@ export function RecoveryScreen() {
             <p className="pwa-text">
               Budget keeps the version from just before your last change. It has {describeContents(countsOf(previous))}.
             </p>
-            <button type="button" className="pwa-btn pwa-btn--primary" onClick={() => actions.replaceAll(previous)}>
+            <button
+              type="button"
+              className={`pwa-btn ${newerVersion ? 'pwa-btn--secondary' : 'pwa-btn--primary'}`}
+              onClick={() => restore(previous)}
+            >
               Restore the last good copy
             </button>
           </section>
@@ -133,7 +169,7 @@ export function RecoveryScreen() {
           {!picked && (
             <button
               type="button"
-              className={`pwa-btn ${previous ? 'pwa-btn--secondary' : 'pwa-btn--primary'}`}
+              className={`pwa-btn ${previous || newerVersion ? 'pwa-btn--secondary' : 'pwa-btn--primary'}`}
               onClick={() => fileInput.current?.click()}
             >
               Choose a backup file
@@ -150,7 +186,7 @@ export function RecoveryScreen() {
                 This backup{pickedDate ? ` from ${pickedDate}` : ''} has {describeContents(picked.summary)}.
               </p>
               <div className="pwa-actions">
-                <button type="button" className="pwa-btn pwa-btn--primary" onClick={() => actions.replaceAll(picked.data)}>
+                <button type="button" className="pwa-btn pwa-btn--primary" onClick={() => restore(picked.data)}>
                   Restore this backup
                 </button>
                 <button type="button" className="pwa-btn pwa-btn--secondary" onClick={() => setPicked(null)}>
@@ -178,19 +214,33 @@ export function RecoveryScreen() {
           </section>
         )}
 
-        <section className="pwa-card" aria-labelledby="pwa-rec-fresh">
+        <section className={`pwa-card${newerVersion ? ' pwa-card--quiet' : ''}`} aria-labelledby="pwa-rec-fresh">
           <h2 className="pwa-card__title" id="pwa-rec-fresh">
             Start fresh
           </h2>
           {!confirmFresh ? (
             <>
-              <p className="pwa-text">Erase what's saved in the app on this phone and set up a new budget.</p>
-              <button type="button" className="pwa-btn pwa-btn--danger" onClick={() => setConfirmFresh(true)}>
+              <p className="pwa-text">
+                {newerVersion
+                  ? "Only if updating doesn't help: erase what's saved in the app on this phone and set up a new budget."
+                  : "Erase what's saved in the app on this phone and set up a new budget."}
+              </p>
+              <button
+                type="button"
+                className={`pwa-btn ${newerVersion ? 'pwa-btn--quiet' : 'pwa-btn--danger'}`}
+                onClick={() => setConfirmFresh(true)}
+              >
                 Start fresh
               </button>
             </>
           ) : (
-            <div className="pwa-confirm" role="alertdialog" aria-labelledby="pwa-rec-fresh-q">
+            <div
+              ref={confirmRef}
+              className="pwa-confirm"
+              role="group"
+              aria-labelledby="pwa-rec-fresh-q"
+              tabIndex={-1}
+            >
               <p className="pwa-text pwa-text--strong" id="pwa-rec-fresh-q">
                 Erase everything and start over? This can't be undone. If you might need the old data, save a copy
                 first.

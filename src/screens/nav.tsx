@@ -13,8 +13,11 @@ export interface Nav {
   intent: Intent | null;
   goTab: (tab: TabKey, intent?: Intent) => void;
   openPage: (page: PageKey) => void;
-  /** Close the current page (uses browser history when the page was pushed, so iOS swipe-back works too). */
-  back: () => void;
+  /**
+   * Close the current page (uses browser history when the page was pushed, so iOS swipe-back works too).
+   * Focus goes back to whatever opened the page, or to the screen title with `focusTitle`.
+   */
+  back: (opts?: { focusTitle?: boolean }) => void;
 }
 
 export const NavContext = createContext<Nav | null>(null);

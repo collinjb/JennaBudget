@@ -7,7 +7,6 @@ import { Chip, ChipRow } from '../components/Chip';
 import { DayPicker } from '../components/DateInput';
 import { EmptyState } from '../components/EmptyState';
 import { cleanName, TextField } from '../components/Field';
-import { IconWarning } from '../components/Icons';
 import { Money } from '../components/Money';
 import { MoneyInput, useMoneyField } from '../components/MoneyInput';
 import { PageHeader } from '../components/PageHeader';
@@ -15,28 +14,43 @@ import { RateInput, useRateField } from '../components/RateInput';
 import { SegmentedControl, Select } from '../components/Select';
 import { useToast } from '../components/Toast';
 import { formatDuration, formatMonth, monthKey, ordinal } from '../lib/dates';
-import { compareExtra, interestWarnings, simulatePayoff } from '../lib/debt';
+import { comparePayoffs, interestWarnings, simulatePayoff, type ExtraComparison } from '../lib/debt';
 import { newId } from '../lib/ids';
-import { formatMoney, formatRate } from '../lib/money';
-import { DEBT_PRESETS, DEBT_TYPE_INFO } from '../lib/presets';
+import { formatMoney, formatRate, MAX_MONEY_CENTS } from '../lib/money';
+import { DEBT_PRESETS, DEBT_TYPE_INFO, METHOD_INFO } from '../lib/presets';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
-import type { Debt, DebtType, PayoffMethod } from '../types';
+import type { Cents, Debt, DebtType } from '../types';
 import { useNav } from './nav';
+import { InterestWarningNotice } from './notices';
 import { useDeleteWithUndo } from './shared';
 
-const SLIDER_MAX_DOLLARS = 1000;
+/** The "pay extra" slider goes up to $1,000 (further when the budget already pays more), in $10 stops. */
+const SLIDER_MIN_MAX: Cents = 100_000;
+const SLIDER_STEP: Cents = 1_000;
 
-export const METHOD_INFO: Record<PayoffMethod, { label: string; text: string }> = {
-  avalanche: {
-    label: 'Save the most money',
-    text: 'Pays off the highest interest rate first. You pay the least interest overall.',
-  },
-  snowball: {
-    label: 'Quick wins',
-    text: 'Pays off the smallest balance first. You knock out whole debts sooner, which feels great.',
-  },
-};
+/** Slider end: $1,000, or the planned extra rounded up to $10 when that's more, never past the app's money limit. */
+function sliderMaxFor(planned: Cents): Cents {
+  return Math.max(SLIDER_MIN_MAX, Math.min(MAX_MONEY_CENTS, Math.ceil(planned / SLIDER_STEP) * SLIDER_STEP));
+}
+
+/** Nearest stop to `v`: a multiple of $10, the exact planned amount (so it can be shown as it is), or the end. */
+function nearestStop(v: Cents, planned: Cents, max: Cents): Cents {
+  const grid = Math.min(max, Math.round(v / SLIDER_STEP) * SLIDER_STEP);
+  return [planned, max].reduce((best, c) => (Math.abs(c - v) < Math.abs(best - v) ? c : best), grid);
+}
+
+/** The next stop up or down from `cur` (arrow keys / VoiceOver swipes move one stop at a time). */
+function nextStop(cur: Cents, dir: 1 | -1, planned: Cents, max: Cents): Cents {
+  if (dir > 0) {
+    let n = (Math.floor(cur / SLIDER_STEP) + 1) * SLIDER_STEP;
+    if (planned > cur && planned < n) n = planned;
+    return Math.min(n, max);
+  }
+  let n = (Math.ceil(cur / SLIDER_STEP) - 1) * SLIDER_STEP;
+  if (planned < cur && planned > n) n = planned;
+  return Math.max(n, 0);
+}
 
 type SheetState = { kind: 'edit'; debt: Debt | null } | { kind: 'balance'; debt: Debt };
 
@@ -55,20 +69,38 @@ export function DebtScreen() {
   const active = useMemo(() => debts.filter((d) => d.balance > 0), [debts]);
   const method = data.settings.payoffMethod;
   const planned = data.settings.extraDebtPayment;
-  // null = not moved yet: shows exactly what the budget pays now.
-  const [touchedDollars, setSliderDollars] = useState<number | null>(null);
-  const sliderDollars = touchedDollars ?? Math.round(planned / 1000) * 10;
-  const slider = touchedDollars === null ? planned : touchedDollars * 100;
-  const sliderMax = Math.max(SLIDER_MAX_DOLLARS, Math.ceil(planned / 1000) * 10);
+  // null = not moved yet: shows exactly what the budget pays now. Values are cents; the planned amount is a stop
+  // of its own, so the thumb, its spoken value and the number on screen always agree.
+  const [touched, setTouched] = useState<Cents | null>(null);
+  const sliderMax = sliderMaxFor(planned);
+  const slider = Math.min(touched ?? planned, sliderMax);
 
+  // The payoff at the current pace only depends on the budget; moving the slider re-runs just the "what if".
   const base = useMemo(
     () => (active.length ? simulatePayoff(active, { method, extra: planned, startMonth: month }) : null),
     [active, method, planned, month],
   );
-  const cmp = useMemo(
-    () => (active.length ? compareExtra(active, method, planned, slider, month) : null),
-    [active, method, planned, slider, month],
+  const withExtra = useMemo(
+    () =>
+      !base || slider === planned ? base : simulatePayoff(active, { method, extra: slider, startMonth: month }),
+    [base, active, method, planned, slider, month],
   );
+  const cmp = useMemo(() => (base && withExtra ? comparePayoffs(base, withExtra) : null), [base, withExtra]);
+  const trend = useMemo(() => {
+    if (!base || base.months !== null) return null;
+    const first = base.timeline[0];
+    const last = base.timeline[base.timeline.length - 1];
+    return last > first ? 'grows' : last === first ? 'flat' : 'slow';
+  }, [base]);
+
+  const onSlide = (raw: string) => {
+    const v = Math.round(Number(raw) * 100);
+    if (!Number.isFinite(v)) return;
+    let next = nearestStop(Math.max(0, Math.min(sliderMax, v)), planned, sliderMax);
+    // A tiny nudge (keyboard arrow, VoiceOver swipe) moves to the next stop instead of snapping back.
+    if (next === slider && v !== slider) next = nextStop(slider, v > slider ? 1 : -1, planned, sliderMax);
+    setTouched(next);
+  };
   const warnings = useMemo(() => interestWarnings(active), [active]);
   const totalDebt = useMemo(() => debts.reduce((a, d) => a + d.balance, 0), [debts]);
   const sliderId = useId();
@@ -76,13 +108,13 @@ export function DebtScreen() {
   const applyExtra = () => {
     const prev = planned;
     actions.updateSettings({ extraDebtPayment: slider });
-    setSliderDollars(null);
+    setTouched(null);
     toast.show({
       message: slider > 0 ? `Paying ${formatMoney(slider)} extra each month` : 'Extra payment removed',
       actionLabel: 'Undo',
       onAction: () => {
         actions.updateSettings({ extraDebtPayment: prev });
-        setSliderDollars(null);
+        setTouched(null);
       },
     });
   };
@@ -111,7 +143,7 @@ export function DebtScreen() {
               <>
                 <p className="bignum__label">Debt-free</p>
                 <p className="debt-summary__date tone-savings" data-testid="debt-free-date">
-                  You're debt-free! 🎉
+                  You're debt-free!<span aria-hidden="true"> 🎉</span>
                 </p>
               </>
             ) : base && base.months !== null && base.debtFreeMonth ? (
@@ -129,7 +161,11 @@ export function DebtScreen() {
                   More than 50 years
                 </p>
                 <p className="muted small">
-                  At this pace your debt won't be paid off. Paying a little extra each month can change that.
+                  {trend === 'slow'
+                    ? 'At this pace it takes more than 50 years. Paying a little extra each month speeds that up a lot.'
+                    : trend === 'flat'
+                      ? "At this pace your debt never goes down. Paying a little extra each month can change that."
+                      : 'At this pace your debt keeps growing. Paying a little extra each month can change that.'}
                 </p>
               </>
             )}
@@ -152,19 +188,12 @@ export function DebtScreen() {
           </Card>
 
           {warnings.map((w) => (
-            <p key={w.debtId} className="notice notice--warn" role="note">
-              <IconWarning size={18} />
-              <span>
-                <strong>{w.name}:</strong> Your <Money cents={w.minPayment} /> payment doesn't cover the{' '}
-                <Money cents={w.monthlyInterest} /> of interest each month, so this balance will keep growing.
-                {base && base.months !== null && ' Your plan still pays it off later, once extra money goes to it.'}
-              </span>
-            </p>
+            <InterestWarningNotice key={w.debtId} warning={w} paysOffLater={!!base && base.months !== null} />
           ))}
 
           {/* Debts */}
           <h2 className="section-title">Your debts</h2>
-          <ul className="stack stack--sm">
+          <ul className="stack stack--sm" role="list">
             {debts.map((d) => {
               const info = DEBT_TYPE_INFO[d.type];
               const paidOff = d.balance === 0;
@@ -182,7 +211,9 @@ export function DebtScreen() {
                     </div>
                     <div className="debt-card__bal">
                       {paidOff ? (
-                        <span className="badge badge--paid">Paid off 🎉</span>
+                        <span className="badge badge--paid">
+                          Paid off<span aria-hidden="true"> 🎉</span>
+                        </span>
                       ) : (
                         <>
                           <Money cents={d.balance} className="debt-card__amount" />
@@ -232,21 +263,22 @@ export function DebtScreen() {
                 <label htmlFor={sliderId} className="extra-card__q">
                   What if I paid <strong className="extra-card__val">{formatMoney(slider)}</strong> extra each month?
                 </label>
+                {/* Value in dollars (cents allowed) so it matches the amount shown; it moves in $10 stops. */}
                 <input
                   id={sliderId}
                   className="slider"
                   type="range"
                   min={0}
-                  max={sliderMax}
-                  step={10}
-                  value={sliderDollars}
+                  max={sliderMax / 100}
+                  step={0.01}
+                  value={slider / 100}
                   aria-valuetext={`${formatMoney(slider)} extra each month`}
-                  onChange={(e) => setSliderDollars(Number(e.target.value))}
-                  style={{ '--fill': `${(sliderDollars / sliderMax) * 100}%` } as CSSProperties}
+                  onChange={(e) => onSlide(e.target.value)}
+                  style={{ '--fill': `${(slider / sliderMax) * 100}%` } as CSSProperties}
                 />
                 <div className="slider__ends" aria-hidden="true">
                   <span>$0</span>
-                  <span>{formatMoney(sliderMax * 100)}</span>
+                  <span>{formatMoney(sliderMax)}</span>
                 </div>
                 <p className="extra-card__result" aria-live="polite">
                   <ExtraResult planned={planned} slider={slider} cmp={cmp} />
@@ -282,7 +314,7 @@ export function DebtScreen() {
                 />
                 {/* Listed in the order they finish (a small debt can finish early on its minimum alone). */}
                 <h3 className="order-title">When each debt is paid off</h3>
-                <ol className="order-list">
+                <ol className="order-list" role="list">
                   {base.perDebt.map((p, i) => {
                     const d = active.find((x) => x.id === p.id);
                     return (
@@ -305,10 +337,13 @@ export function DebtScreen() {
 
               {/* Chart (only when it actually comes down: 50 years of a growing balance is just a scary number) */}
               <Card title="Your debt over time">
-                {base.months === null ? (
+                {base.months === null && trend !== 'slow' ? (
                   <p className="muted small">
-                    At this pace your debt grows instead of shrinking, so there's no payoff line to show yet. Try the
-                    &ldquo;Pay it off faster&rdquo; slider above to see what a little extra each month does.
+                    {trend === 'flat'
+                      ? 'At this pace your debt stays the same instead of shrinking'
+                      : 'At this pace your debt grows instead of shrinking'}
+                    , so there's no payoff line to show yet. Try the &ldquo;Pay it off faster&rdquo; slider above to see
+                    what a little extra each month does.
                   </p>
                 ) : (
                   <LineChart
@@ -341,21 +376,21 @@ export function DebtScreen() {
         />
       )}
       {celebrate && (
-        <Celebration title="Paid off!" message={`You paid off ${celebrate}. 🎉`} onDone={() => setCelebrate(null)} />
+        <Celebration
+          title="Paid off!"
+          message={
+            <>
+              You paid off {celebrate}.<span aria-hidden="true"> 🎉</span>
+            </>
+          }
+          onDone={() => setCelebrate(null)}
+        />
       )}
     </div>
   );
 }
 
-function ExtraResult({
-  planned,
-  slider,
-  cmp,
-}: {
-  planned: number;
-  slider: number;
-  cmp: ReturnType<typeof compareExtra>;
-}) {
+function ExtraResult({ planned, slider, cmp }: { planned: number; slider: number; cmp: ExtraComparison }) {
   if (slider === planned) return <>Slide to see how paying extra changes your debt-free date.</>;
   const { base, withExtra, monthsSooner, interestSaved } = cmp;
   if (slider > planned) {
@@ -410,9 +445,10 @@ function ExtraResult({
   );
 }
 
+// Plain labels (the emoji of the chosen type is shown inside the field, hidden from screen readers).
 const DEBT_TYPE_OPTIONS = (Object.keys(DEBT_TYPE_INFO) as DebtType[]).map((t) => ({
   value: t,
-  label: `${DEBT_TYPE_INFO[t].emoji}  ${DEBT_TYPE_INFO[t].label}`,
+  label: DEBT_TYPE_INFO[t].label,
 }));
 
 export function DebtSheet({ debt, onClose }: { debt: Debt | null; onClose: () => void }) {
@@ -469,7 +505,13 @@ export function DebtSheet({ debt, onClose }: { debt: Debt | null; onClose: () =>
         </ChipRow>
       )}
       <TextField label="Name" value={name} onChange={setName} placeholder="Like Visa card" />
-      <Select label="What kind?" value={type} options={DEBT_TYPE_OPTIONS} onChange={setType} />
+      <Select
+        label="What kind?"
+        value={type}
+        options={DEBT_TYPE_OPTIONS}
+        onChange={setType}
+        decoration={DEBT_TYPE_INFO[type].emoji}
+      />
       <MoneyInput label="How much do you owe now?" {...balance.props} big helper="The current balance on your statement." />
       <RateInput label="Interest rate" {...rate.props} helper="The APR % on your statement. Use 0 if there's no interest." />
       <MoneyInput label="Minimum monthly payment" {...minPay.props} />

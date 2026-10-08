@@ -14,14 +14,21 @@ interface SelectProps<T extends string> {
   options: Option<T>[];
   onChange: (value: T) => void;
   helper?: ReactNode;
+  /** Decorative mark shown before the chosen option (e.g. its emoji); hidden from screen readers. */
+  decoration?: ReactNode;
 }
 
 /** Native select (iPhone shows its picker wheel), styled like the other fields. */
-export function Select<T extends string>({ label, value, options, onChange, helper }: SelectProps<T>) {
+export function Select<T extends string>({ label, value, options, onChange, helper, decoration }: SelectProps<T>) {
   return (
     <Field label={label} helper={helper}>
       {({ inputId, describedBy }) => (
         <div className="field__control field__control--select">
+          {decoration && (
+            <span className="field__prefix field__prefix--deco" aria-hidden="true">
+              {decoration}
+            </span>
+          )}
           <select
             id={inputId}
             className="input input--select"
@@ -61,18 +68,15 @@ export function SegmentedControl<T extends string>({
   helper,
 }: SegmentedProps<T>) {
   const id = useId();
+  const helpId = helper ? `${id}-help` : undefined;
   const index = Math.max(
     0,
     options.findIndex((o) => o.value === value),
   );
   return (
-    <fieldset className="seg-field">
+    <fieldset className="seg-field" aria-describedby={helpId}>
       <legend className={hideLabel ? 'sr-only' : 'field__label'}>{label}</legend>
-      <div
-        className="seg"
-        style={{ '--seg-count': options.length, '--seg-index': index } as CSSProperties}
-        aria-describedby={helper ? `${id}-help` : undefined}
-      >
+      <div className="seg" style={{ '--seg-count': options.length, '--seg-index': index } as CSSProperties}>
         <span className="seg__thumb" aria-hidden="true" />
         {options.map((o) => (
           <label key={o.value} className="seg__opt">
@@ -82,6 +86,7 @@ export function SegmentedControl<T extends string>({
               name={id}
               value={o.value}
               checked={o.value === value}
+              aria-describedby={helpId}
               onChange={() => onChange(o.value)}
             />
             <span className="seg__text">{o.label}</span>
@@ -89,7 +94,7 @@ export function SegmentedControl<T extends string>({
         ))}
       </div>
       {helper && (
-        <p className="field__helper" id={`${id}-help`}>
+        <p className="field__helper" id={helpId}>
           {helper}
         </p>
       )}

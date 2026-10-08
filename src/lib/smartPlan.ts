@@ -1,12 +1,13 @@
 import type { BudgetData, Cents, Debt, Goal, ISODate, MonthKey, PayoffMethod, SpendingCategory } from '../types';
 import { compareISO, formatMonth, monthKey } from './dates';
-import { interestWarnings, MAX_PAYOFF_MONTHS, payoffOrder, simulatePayoff } from './debt';
+import { interestWarnings, MAX_PAYOFF_MONTHS, payoffOrder, simulatePayoff, type InterestWarningKind } from './debt';
 import { billMonthly } from './frequency';
 import { projectGoal, type GoalProjection } from './goals';
 import { newId } from './ids';
-import { ceilDollars, ceilToStep, floorDollars, formatMoney, formatRate } from './money';
+import { ceilDollars, ceilToStep, floorDollars, formatMoney, formatRate, MAX_MONEY_CENTS } from './money';
 import { PLAN_CONFIG } from './planConfig';
 import { monthlySummary } from './summary';
+import { compareText } from './text';
 
 export type PlanLineKind = 'spending' | 'goal' | 'extraDebt' | 'newGoal' | 'newSpending';
 
@@ -90,6 +91,10 @@ export const PLAN_WHY = {
   debtNone: "There's no extra money for debt right now. Your minimums are covered.",
   debtGrowing: (name: string) =>
     `Your ${name} payment doesn't cover its interest, so the balance grows every month. This extra stops that and pays it off.`,
+  debtFlat: (name: string) =>
+    `Your ${name} payment only covers its interest, so the balance never goes down. This extra pays it off.`,
+  debtNoPayment: (name: string) =>
+    `Your ${name} has no monthly payment set, so it never gets paid down. This extra pays it off.`,
   leverBill: 'Could you lower, switch, or cancel this?',
   leverNeed: 'Even a small trim here helps.',
 } as const;
@@ -100,6 +105,21 @@ export const NEW_EMERGENCY_FUND = { name: 'Emergency Fund', emoji: '🛟' } as c
 export const NEW_FUN_MONEY = { name: 'Fun Money', emoji: '🎉' } as const;
 
 const C = PLAN_CONFIG;
+
+/**
+ * Largest amount the plan ever suggests for one line (or a new goal's target): the app's money limit, rounded down to
+ * whole dollars so every suggestion stays a whole-dollar amount. Anything above it simply stays as Left Over.
+ */
+export const MAX_PLAN_AMOUNT: Cents = floorDollars(MAX_MONEY_CENTS);
+
+const capPlan = (cents: Cents): Cents => Math.min(MAX_PLAN_AMOUNT, cents);
+
+/** The rescue "why" for a debt that never shrinks on its own, worded for the actual cause. */
+function rescueWhy(kind: InterestWarningKind, name: string): string {
+  if (kind === 'flat') return PLAN_WHY.debtFlat(name);
+  if (kind === 'no-payment') return PLAN_WHY.debtNoPayment(name);
+  return PLAN_WHY.debtGrowing(name);
+}
 
 /** A ratio from planConfig as integer basis points (0.15 -> 1500), so the math stays in integers. */
 function ratioBps(ratio: number): number {
@@ -167,10 +187,6 @@ export function splitEquallyWithCaps(units: number, caps: number[]): { gives: nu
     open = open.filter((i) => !capped.includes(i));
   }
   return { gives, overflow: pool };
-}
-
-function compareText(a: string, b: string): number {
-  return a.localeCompare(b, 'en-US', { sensitivity: 'base' }) || (a < b ? -1 : a > b ? 1 : 0);
 }
 
 /**
@@ -280,22 +296,23 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
   // ----- 0) A debt that grows every month comes first -----
   // Its minimum doesn't cover the interest, so nothing else matters as much. Give it the smallest extra that pays it
   // off within GROWING_DEBT_PAYOFF_MONTHS (capped at a share of free money), and never less than what stops it growing.
-  const growing = interestWarnings(activeDebts).map((w) => activeDebts.find((d) => d.id === w.debtId) as Debt);
+  const warnings = interestWarnings(activeDebts);
+  const growing = warnings.map((w) => activeDebts.find((d) => d.id === w.debtId) as Debt);
   let rescue = 0;
   if (growing.length > 0) {
     const all = floorDollars(R);
     const stopGrowing = smallestExtraToFinish(growing, method, startMonth, MAX_PAYOFF_MONTHS, all) ?? all;
     const target = smallestExtraToFinish(growing, method, startMonth, C.GROWING_DEBT_PAYOFF_MONTHS, all) ?? all;
-    rescue = Math.max(stopGrowing, Math.min(target, shareDollars(R, C.GROWING_DEBT_MAX_SHARE)));
+    rescue = capPlan(Math.max(stopGrowing, Math.min(target, shareDollars(R, C.GROWING_DEBT_MAX_SHARE))));
     R -= rescue;
   }
 
   // ----- A) Safety net -----
   const ef = data.goals.find((g) => g.isEmergencyFund) ?? null;
-  const efTarget = ef ? ef.target : Math.max(C.STARTER_EMERGENCY_FUND, ceilToStep(fixed, 10_000));
+  const efTarget = ef ? ef.target : capPlan(Math.max(C.STARTER_EMERGENCY_FUND, ceilToStep(fixed, 10_000)));
   const efRemaining = Math.max(0, efTarget - (ef ? ef.saved : 0));
   const efMonthly =
-    efRemaining > 0 ? Math.min(ceilDollars(efRemaining), shareDollars(R, C.EMERGENCY_FUND_SHARE)) : 0;
+    efRemaining > 0 ? capPlan(Math.min(ceilDollars(efRemaining), shareDollars(R, C.EMERGENCY_FUND_SHARE))) : 0;
   R -= efMonthly;
   let newGoal: Goal | null = null;
   if (ef) {
@@ -343,7 +360,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
 
   // ----- B) Fun money -----
   const funTarget = shareDollars(income, tight ? C.FUN_PCT_TIGHT : C.FUN_PCT_COMFORTABLE);
-  const fun = Math.min(funTarget, shareDollars(R, C.FUN_MAX_SHARE));
+  const fun = capPlan(Math.min(funTarget, shareDollars(R, C.FUN_MAX_SHARE)));
   R -= fun;
   const funWhy = fun === 0 ? PLAN_WHY.funNone : tight ? PLAN_WHY.funTight : PLAN_WHY.fun;
   const funCats = data.spending.filter((s) => s.kind !== 'need');
@@ -394,7 +411,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
     )
     .map(({ g }) => g);
   for (const g of deadlineGoals) {
-    const needed = ceilDollars(project(g).neededPerMonth ?? 0);
+    const needed = capPlan(ceilDollars(project(g).neededPerMonth ?? 0));
     const give = Math.min(needed, floorDollars(R));
     R -= give;
     const month = monthKey(g.targetDate ?? today);
@@ -424,12 +441,12 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
     debtClass = 'other';
     debtShare = C.OTHER_DEBT_SHARE;
   }
-  const share = shareDollars(R, debtShare);
+  const share = Math.min(shareDollars(R, debtShare), MAX_PLAN_AMOUNT - rescue);
   R -= share;
   let extra = rescue + share;
 
   // ----- F) Open goals (no deadline, or the deadline passed): equal split, capped at what's left to save -----
-  const caps = openGoals.map((g) => ceilDollars(project(g).remaining) / 100);
+  const caps = openGoals.map((g) => capPlan(ceilDollars(project(g).remaining)) / 100);
   const { gives, overflow } = splitEquallyWithCaps(floorDollars(R) / 100, caps);
   openGoals.forEach((g, i) => {
     const give = gives[i] * 100;
@@ -445,8 +462,9 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
     goalLines.push({ line, goal: g });
   });
   if (overflow > 0 && activeDebts.length > 0) {
-    extra += overflow * 100;
-    R -= overflow * 100;
+    const add = Math.min(overflow * 100, MAX_PLAN_AMOUNT - extra);
+    extra += add;
+    R -= add;
   }
 
   if (activeDebts.length > 0) {
@@ -457,7 +475,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
       emoji: EXTRA_DEBT_LINE.emoji,
       from: S.debtExtra,
       to: extra,
-      why: rescue > 0 ? PLAN_WHY.debtGrowing(growing[0].name) : extraDebtWhy(extra, debtClass, activeDebts, method),
+      why: rescue > 0 ? rescueWhy(warnings[0].kind, growing[0].name) : extraDebtWhy(extra, debtClass, activeDebts, method),
     });
   }
 

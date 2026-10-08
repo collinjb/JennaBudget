@@ -1,4 +1,4 @@
-import { Component, useEffect, useState, type ReactNode } from 'react';
+import { Component, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import './pwa.css';
 
@@ -55,10 +55,6 @@ function UpdateBannerInner() {
     };
   }, [registration]);
 
-  // "Not now" hides the banner for this session only. The waiting version still takes over the next
-  // time the app is fully closed and reopened, so nobody gets stuck on an old version.
-  if (!needRefresh || dismissed) return null;
-
   const refresh = () => {
     setRefreshing(true);
     // Tells the waiting service worker to take over; the page reloads when it does.
@@ -66,17 +62,45 @@ function UpdateBannerInner() {
     window.setTimeout(() => window.location.reload(), REFRESH_FALLBACK_MS);
   };
 
+  // "Not now" hides the banner for this session only. The waiting version still takes over the next
+  // time the app is fully closed and reopened, so nobody gets stuck on an old version.
+  if (!needRefresh || dismissed) return null;
+  return <Banner refreshing={refreshing} onRefresh={refresh} onDismiss={() => setDismissed(true)} />;
+}
+
+/**
+ * The banner itself. While it shows, the app is pushed down by its height (--update-banner-h, see pwa.css), so it
+ * never covers the screen's own buttons; it hides while a sheet or dialog is open.
+ */
+function Banner({ refreshing, onRefresh, onDismiss }: { refreshing: boolean; onRefresh: () => void; onDismiss: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const measure = () => {
+      if (el.offsetHeight > 0) root.style.setProperty('--update-banner-h', `${el.offsetHeight}px`);
+    };
+    measure();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+      root.style.removeProperty('--update-banner-h');
+    };
+  }, []);
+
   return (
-    <div className="pwa-update" role="status" aria-live="polite">
+    <div ref={ref} className="pwa-update" role="status" aria-live="polite">
       <span className="pwa-update__icon" aria-hidden="true">
         ✨
       </span>
       <p className="pwa-update__text">A new version is ready</p>
-      <button type="button" className="pwa-btn pwa-btn--primary pwa-update__refresh" onClick={refresh} disabled={refreshing}>
+      <button type="button" className="pwa-btn pwa-btn--primary pwa-update__refresh" onClick={onRefresh} disabled={refreshing}>
         {refreshing ? 'Refreshing…' : 'Refresh'}
       </button>
       {!refreshing && (
-        <button type="button" className="pwa-update__close" aria-label="Not now" onClick={() => setDismissed(true)}>
+        <button type="button" className="pwa-update__close" aria-label="Not now" onClick={onDismiss}>
           <span aria-hidden="true">✕</span>
         </button>
       )}

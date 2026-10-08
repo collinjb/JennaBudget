@@ -1,6 +1,7 @@
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 import { formatMonth } from '../lib/dates';
+import type { Option } from '../components/Select';
 import { FREQUENCY_LABELS, type AnyFrequency } from '../lib/frequency';
 import { extraPaycheckMonths } from '../lib/schedule';
 import { useBudget } from '../state/store';
@@ -9,6 +10,11 @@ import type { CollectionName, Income, MonthKey } from '../types';
 /** "every 2 weeks", "twice a month", "once a year" */
 export function freqText(f: AnyFrequency): string {
   return FREQUENCY_LABELS[f].toLowerCase();
+}
+
+/** Choices for a "How often?" picker, worded the same everywhere ("Every 2 weeks", "Every month", …). */
+export function frequencyOptions<T extends AnyFrequency>(freqs: readonly T[]): Option<T>[] {
+  return freqs.map((value) => ({ value, label: FREQUENCY_LABELS[value] }));
 }
 
 /** plural(3, 'bill') => '3 bills' */

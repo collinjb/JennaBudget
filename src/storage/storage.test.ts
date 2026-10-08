@@ -6,11 +6,13 @@ import {
   MIN_STORED_DATE,
   STORAGE_KEY,
   clearData,
+  formatExportedAt,
   isStorageAvailable,
   loadData,
   loadPreviousData,
   localDateStamp,
   makeBackup,
+  markOnboardedIfFilled,
   migrate,
   parseBackup,
   readRawData,
@@ -587,6 +589,11 @@ describe('migrate', () => {
   });
 });
 
+/** What a backup made on `date` contains: the same data, with that date as the last backup. */
+function backedUp(data: BudgetData, date: string): BudgetData {
+  return { ...data, settings: { ...data.settings, lastBackupAt: date } };
+}
+
 describe('backups', () => {
   it('makeBackup: dated filename and the documented wrapper', () => {
     const data = sample();
@@ -597,25 +604,39 @@ describe('backups', () => {
     expect(file.version).toBe(1);
     expect(typeof file.exportedAt).toBe('string');
     expect(Number.isNaN(Date.parse(file.exportedAt))).toBe(false);
-    expect(file.data).toEqual(data);
+    expect(file.data).toEqual(backedUp(data, '2026-10-08'));
   });
 
-  it('backup → parse round-trips exactly', () => {
+  it("a backup records its own date as the last backup (restoring it doesn't forget it)", () => {
+    const data = sample();
+    expect(data.settings.lastBackupAt).toBe('2026-10-03');
+    const res = parseBackup(makeBackup(data, '2026-10-08').json);
+    if (!res.ok) throw new Error(res.error);
+    expect(res.data.settings.lastBackupAt).toBe('2026-10-08');
+    // Nothing else changes, and the data passed in isn't touched.
+    expect({ ...res.data, settings: { ...res.data.settings, lastBackupAt: null } }).toEqual({
+      ...data,
+      settings: { ...data.settings, lastBackupAt: null },
+    });
+    expect(data.settings.lastBackupAt).toBe('2026-10-03');
+  });
+
+  it('backup → parse round-trips exactly (apart from the backup date)', () => {
     const data = sample();
     const res = parseBackup(makeBackup(data, '2026-10-08').json);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
-    expect(res.data).toEqual(data);
+    expect(res.data).toEqual(backedUp(data, '2026-10-08'));
     expect(res.summary).toMatchObject({ incomes: 2, bills: 2, debts: 2, spending: 2, goals: 2 });
     expect(typeof res.summary.exportedAt).toBe('string');
   });
 
-  it('backup → parse → save → load round-trips exactly', () => {
+  it('backup → parse → save → load round-trips exactly (apart from the backup date)', () => {
     const data = sample();
     const res = parseBackup(makeBackup(data, '2026-10-08').json);
     if (!res.ok) throw new Error(res.error);
     saveData(res.data);
-    expect(loadData()).toEqual({ status: 'ok', data, migrated: false });
+    expect(loadData()).toEqual({ status: 'ok', data: backedUp(data, '2026-10-08'), migrated: false });
   });
 
   it('accepts bare BudgetData (e.g. a raw copy of the saved data)', () => {
@@ -710,7 +731,7 @@ describe('shareOrDownloadBackup', () => {
     expect(file.name).toBe('budget-backup-2026-10-08.json');
     expect(file.type).toBe('application/json');
     const parsed = parseBackup(await file.text());
-    expect(parsed.ok && parsed.data).toEqual(sample());
+    expect(parsed.ok && parsed.data).toEqual(backedUp(sample(), '2026-10-08'));
   });
 
   it('returns cancelled when the user closes the share sheet', async () => {
@@ -734,6 +755,26 @@ describe('shareOrDownloadBackup', () => {
     expect(anchor.href).toMatch(/^blob:/);
     expect(anchor.click).toHaveBeenCalledOnce();
     expect(anchor.remove).toHaveBeenCalledOnce();
+  });
+
+  it('a share sheet that is already opening (double tap) neither shares again nor downloads', async () => {
+    const { doc, anchor } = fakeDocument();
+    vi.stubGlobal('document', doc);
+    vi.stubGlobal('navigator', {
+      canShare: () => true,
+      share: () => Promise.reject(new DOMException('An earlier share has not yet completed.', 'InvalidStateError')),
+    });
+    expect(await shareOrDownloadBackup(sample(), '2026-10-08')).toBe('cancelled');
+    expect(anchor.click).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a download when share() rejects the file type', async () => {
+    vi.useFakeTimers();
+    const { doc, anchor } = fakeDocument();
+    vi.stubGlobal('document', doc);
+    vi.stubGlobal('navigator', { canShare: () => true, share: () => Promise.reject(new TypeError('bad data')) });
+    expect(await shareOrDownloadBackup(sample(), '2026-10-08')).toBe('downloaded');
+    expect(anchor.click).toHaveBeenCalledOnce();
   });
 
   it('downloads when the browser cannot share files', async () => {
@@ -782,5 +823,31 @@ describe('requestPersistentStorage', () => {
 describe('localDateStamp', () => {
   it('formats the local date', () => {
     expect(localDateStamp(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+  });
+});
+
+describe('formatExportedAt', () => {
+  it('formats a backup timestamp as a short local date', () => {
+    expect(formatExportedAt(new Date(2026, 9, 3, 12).toISOString())).toBe('Oct 3, 2026');
+  });
+  it('is null when missing or unreadable', () => {
+    expect(formatExportedAt(null)).toBeNull();
+    expect(formatExportedAt('')).toBeNull();
+    expect(formatExportedAt('not a date')).toBeNull();
+  });
+});
+
+describe('markOnboardedIfFilled', () => {
+  it('marks a restored budget with items as set up', () => {
+    const d = { ...emptyBudget(), incomes: sample().incomes };
+    expect(d.settings.onboarded).toBe(false);
+    expect(markOnboardedIfFilled(d).settings.onboarded).toBe(true);
+    expect(d.settings.onboarded).toBe(false); // never mutates
+  });
+  it('leaves an empty budget (and one already set up) as it is', () => {
+    const empty = emptyBudget();
+    expect(markOnboardedIfFilled(empty)).toBe(empty);
+    const done = sample();
+    expect(markOnboardedIfFilled(done)).toBe(done);
   });
 });

@@ -4,6 +4,8 @@ import {
   MAX_PAYOFF_MONTHS,
   compareExtra,
   interestWarnings,
+  comparePayoffs,
+  minimumDue,
   monthlyInterest,
   payoffOrder,
   simulatePayoff,
@@ -289,11 +291,36 @@ describe('never paying off', () => {
 
   it('interestWarnings flags it with the numbers for the message', () => {
     expect(interestWarnings([stuck])).toEqual([
-      { debtId: 's', name: 'Card', monthlyInterest: 3_100, minPayment: 2_500 },
+      { debtId: 's', name: 'Card', kind: 'grows', monthlyInterest: 3_100, minPayment: 2_500 },
     ]);
     expect(interestWarnings([{ ...stuck, minPayment: 3_101 }])).toEqual([]);
-    expect(interestWarnings([{ ...stuck, rateBps: 0, minPayment: 0 }])).toEqual([]);
+    expect(interestWarnings([{ ...stuck, rateBps: 0, minPayment: 2_500 }])).toEqual([]);
     expect(interestWarnings([{ ...stuck, balance: 0 }])).toEqual([]);
+    expect(interestWarnings([{ ...stuck, balance: 0, minPayment: 0 }])).toEqual([]);
+  });
+
+  it('interestWarnings tells growing, flat and no-payment debts apart', () => {
+    // $1,550 at 24% => $31 of interest a month.
+    expect(interestWarnings([{ ...stuck, minPayment: 3_099 }])[0].kind).toBe('grows');
+    expect(interestWarnings([{ ...stuck, minPayment: 3_100 }])).toEqual([
+      { debtId: 's', name: 'Card', kind: 'flat', monthlyInterest: 3_100, minPayment: 3_100 },
+    ]);
+    // No minimum at all: a 0% debt that never gets paid down, and a card with interest but no payment.
+    expect(interestWarnings([{ ...stuck, rateBps: 0, minPayment: 0 }])).toEqual([
+      { debtId: 's', name: 'Card', kind: 'no-payment', monthlyInterest: 0, minPayment: 0 },
+    ]);
+    expect(interestWarnings([{ ...stuck, minPayment: 0 }])[0]).toMatchObject({ kind: 'no-payment', monthlyInterest: 3_100 });
+  });
+
+  it('interestWarnings keeps the order the debts were given in', () => {
+    const a = debt({ id: 'a', name: 'Zed', balance: 50_000, rateBps: 0, minPayment: 0 });
+    const b = debt({ id: 'b', name: 'Amy', balance: 155_000, rateBps: 2400, minPayment: 3_100 });
+    const fine = debt({ id: 'c', name: 'Fine', balance: 10_000, rateBps: 500, minPayment: 1_000 });
+    expect(interestWarnings([a, fine, b, stuck]).map((w) => [w.debtId, w.kind])).toEqual([
+      ['a', 'no-payment'],
+      ['b', 'flat'],
+      ['s', 'grows'],
+    ]);
   });
 
   it('extra makes it finite', () => {
@@ -322,8 +349,23 @@ describe('never paying off', () => {
   });
 });
 
+describe('minimumDue', () => {
+  it('is min(minimum, balance), never negative', () => {
+    expect(minimumDue(5_000, 200_000)).toBe(5_000);
+    expect(minimumDue(5_000, 2_000)).toBe(2_000);
+    expect(minimumDue(5_000, 0)).toBe(0);
+    expect(minimumDue(0, 2_000)).toBe(0);
+  });
+});
+
 describe('compareExtra', () => {
   const loan = debt({ balance: 1_000_000, rateBps: 600, minPayment: 20_000 });
+
+  it('comparePayoffs gives the same answer from two runs already made', () => {
+    const base = simulatePayoff([loan], { method: 'avalanche', extra: 0, startMonth: start });
+    const more = simulatePayoff([loan], { method: 'avalanche', extra: 10_000, startMonth: start });
+    expect(comparePayoffs(base, more)).toEqual(compareExtra([loan], 'avalanche', 0, 10_000, start));
+  });
 
   it('reports months sooner and interest saved', () => {
     const c = compareExtra([loan], 'avalanche', 0, 10_000, start);

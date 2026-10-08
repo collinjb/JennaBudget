@@ -18,7 +18,8 @@
   --surface: #ffffff;
   --surface-2: #f2f2f7;
   --field: #f2f2f7;
-  --field-border: transparent;
+  /* Outline of fields and switches: 3:1 against both the card and the field fill (WCAG 1.4.11). */
+  --field-border: #8a8a8e;
   --fill: rgba(118, 118, 128, 0.12);
   --fill-strong: rgba(118, 118, 128, 0.2);
   --text: #1c1c1e;
@@ -33,12 +34,15 @@
 
   /* Meaning colors: fills */
   --c-bills: #2f6fed;
-  --c-debt: #f07a2e;
-  --c-savings: #22a55b;
+  /* Fills that carry meaning on their own (progress bars, bars, dots) are at least 3:1 against white. */
+  --c-debt: #d9661c;
+  --c-savings: #1e9450;
   --c-fun: #8b5cf6;
   --c-left: #14a39a;
   --c-over: #e5484d;
   --c-warn: #d97706;
+  /* "On" switches: a deeper green so the white thumb and the track both stand out. */
+  --toggle-on: #1a8a47;
   /* Meaning colors: text ("ink") */
   --c-bills-ink: #1f5bd6;
   --c-debt-ink: #b54708;
@@ -96,6 +100,7 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+  /* Tab bar height (design); the real height with larger text is measured into --tabbar-space. */
   --tabbar-h: 54px;
 }
 
@@ -106,7 +111,7 @@
     --surface: #1c1c1e;
     --surface-2: #2c2c2e;
     --field: #2c2c2e;
-    --field-border: transparent;
+    --field-border: #7c7c80;
     --fill: rgba(118, 118, 128, 0.24);
     --fill-strong: rgba(118, 118, 128, 0.36);
     --text: #f5f5f7;
@@ -125,6 +130,7 @@
     --c-left: #2dd4bf;
     --c-over: #ff6369;
     --c-warn: #fbbf24;
+    --toggle-on: #30b56f;
     --c-bills-ink: #82a8ff;
     --c-debt-ink: #ffa270;
     --c-savings-ink: #4cd98e;
@@ -151,7 +157,7 @@
   --surface: #1c1c1e;
   --surface-2: #2c2c2e;
   --field: #2c2c2e;
-  --field-border: transparent;
+  --field-border: #7c7c80;
   --fill: rgba(118, 118, 128, 0.24);
   --fill-strong: rgba(118, 118, 128, 0.36);
   --text: #f5f5f7;
@@ -170,6 +176,7 @@
   --c-left: #2dd4bf;
   --c-over: #ff6369;
   --c-warn: #fbbf24;
+  --toggle-on: #30b56f;
   --c-bills-ink: #82a8ff;
   --c-debt-ink: #ffa270;
   --c-savings-ink: #4cd98e;
@@ -187,21 +194,4 @@
   --on-primary: #ffffff;
   --link: #6ea0ff;
   --danger: #ff7b80;
-}
-
-html,
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-  -webkit-tap-highlight-color: transparent;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
 }

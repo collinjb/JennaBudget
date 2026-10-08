@@ -190,7 +190,38 @@
   background: #a81e23;
 }
 
+/* Quieter "Start fresh" when updating the app is the real fix (data from a newer version). */
+.pwa-card--quiet {
+  background: transparent;
+  box-shadow: none;
+  padding-top: 0;
+}
+
+.pwa-btn--quiet {
+  background: transparent;
+  color: var(--danger, var(--c-over));
+  min-height: var(--tap, 44px);
+}
+
+.pwa-actions--more {
+  margin-top: var(--space-4, 16px);
+}
+
 /* ---- Update banner ------------------------------------------------------------------------- */
+
+/* While the banner shows, the app moves down by its height, so it never covers the screen's own buttons. */
+body:has(.pwa-update) .app {
+  padding-top: calc(var(--safe-top) + var(--update-banner-h, 62px) + 16px);
+}
+
+body:has(.pwa-update) .pwa-screen {
+  padding-top: calc(var(--safe-top) + var(--update-banner-h, 62px) + 24px);
+}
+
+/* It sits inside #root, which is inert while a sheet or dialog is open: step aside so taps can't fall through. */
+#root[inert] .pwa-update {
+  display: none;
+}
 
 .pwa-update {
   position: fixed;

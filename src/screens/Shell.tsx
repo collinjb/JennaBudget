@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { IconWarning } from '../components/Icons';
-import { prefersReducedMotion } from '../components/modal';
+import { historyState } from '../components/history';
+import { currentOpener, isModalOpen, prefersReducedMotion } from '../components/modal';
 import { TabBar } from '../components/TabBar';
 import { useBudget } from '../state/store';
 import { BillsScreen } from './BillsScreen';
@@ -14,6 +15,33 @@ import { SettingsPage } from './SettingsPage';
 import { SmartPlanPage } from './SmartPlanPage';
 
 const PAGE_STATE_KEY = 'budgetPage';
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea, [tabindex="0"]';
+
+/** What had focus when a page was opened, so Back can return there even though the tab re-renders. */
+interface Opener {
+  tab: TabKey;
+  label: string;
+  index: number;
+}
+
+function labelOf(el: Element): string {
+  return (el.getAttribute('aria-label') ?? el.textContent ?? '').trim();
+}
+
+function rememberOpener(main: HTMLElement | null, tab: TabKey): Opener | null {
+  const active = currentOpener();
+  if (!main || !active || !main.contains(active)) return null;
+  const list = Array.from(main.querySelectorAll(FOCUSABLE));
+  return { tab, label: labelOf(active), index: list.indexOf(active) };
+}
+
+function findOpener(main: HTMLElement, o: Opener): HTMLElement | null {
+  const list = Array.from(main.querySelectorAll<HTMLElement>(FOCUSABLE));
+  const same = list[o.index];
+  if (same && labelOf(same) === o.label) return same;
+  return list.find((el) => labelOf(el) === o.label) ?? null;
+}
 
 function pageFromState(state: unknown): PageKey | null {
   if (state && typeof state === 'object' && PAGE_STATE_KEY in state) {
@@ -35,10 +63,15 @@ export function Shell() {
   const [intent, setIntent] = useState<Intent | null>(null);
   const mainRef = useRef<HTMLElement>(null);
   const scrollPos = useRef<Partial<Record<TabKey, number>>>({});
+  const opener = useRef<Opener | null>(null);
+  /** Back should put focus on the screen title instead of the opener (e.g. after "Use this plan" changed it). */
+  const focusTitleOnBack = useRef(false);
+  const prevPage = useRef<PageKey | null>(null);
 
   useEffect(() => {
-    // A reload while a page was open: start clean on the tabs.
-    if (pageFromState(window.history.state)) window.history.replaceState(null, '');
+    // A reload while a page or sheet was open: start clean on the tabs.
+    const st = historyState();
+    if (pageFromState(st) || 'budgetSheet' in st) window.history.replaceState(null, '');
     const onPop = (e: PopStateEvent) => setPage(pageFromState(e.state));
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -48,7 +81,8 @@ export function Shell() {
     if (!page && mainRef.current) scrollPos.current[tab] = mainRef.current.scrollTop;
   }, [page, tab]);
 
-  const back = useCallback(() => {
+  const back = useCallback((opts?: { focusTitle?: boolean }) => {
+    focusTitleOnBack.current = !!opts?.focusTitle;
     if (pageFromState(window.history.state)) window.history.back();
     else setPage(null);
   }, []);
@@ -56,10 +90,12 @@ export function Shell() {
   const openPage = useCallback(
     (p: PageKey) => {
       rememberScroll();
+      opener.current = rememberOpener(mainRef.current, tab);
+      focusTitleOnBack.current = false;
       window.history.pushState({ [PAGE_STATE_KEY]: p }, '');
       setPage(p);
     },
-    [rememberScroll],
+    [rememberScroll, tab],
   );
 
   const goTab = useCallback(
@@ -82,6 +118,26 @@ export function Shell() {
     if (!el) return;
     el.scrollTop = page ? 0 : (scrollPos.current[tab] ?? 0);
   }, [tab, page]);
+
+  // Focus follows the screen: a page that opens gets its title focused; closing it returns focus to whatever opened
+  // it (or the screen's title when that's gone). A sheet or dialog that opened in the meantime keeps its focus.
+  useEffect(() => {
+    const before = prevPage.current;
+    prevPage.current = page;
+    if (before === page || isModalOpen()) return;
+    const main = mainRef.current;
+    if (!main) return;
+    const title = main.querySelector<HTMLElement>('h1[tabindex]');
+    if (page) {
+      title?.focus({ preventScroll: true });
+      return;
+    }
+    const o = opener.current;
+    opener.current = null;
+    const target = o && o.tab === tab && !focusTitleOnBack.current ? findOpener(main, o) : null;
+    focusTitleOnBack.current = false;
+    (target ?? title)?.focus({ preventScroll: true });
+  }, [page, tab]);
 
   const nav = useMemo<Nav>(() => ({ tab, page, intent, goTab, openPage, back }), [tab, page, intent, goTab, openPage, back]);
 

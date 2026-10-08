@@ -248,15 +248,6 @@ export function IconSparkle(p: IconProps) {
   );
 }
 
-export function IconCalendar(p: IconProps) {
-  return (
-    <Svg {...p}>
-      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
-      <path d="M3.5 9.8h17M8 3v4M16 3v4" />
-    </Svg>
-  );
-}
-
 export function IconShare(p: IconProps) {
   return (
     <Svg {...p}>

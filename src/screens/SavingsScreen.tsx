@@ -13,13 +13,14 @@ import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
 import { SegmentedControl } from '../components/Select';
 import { addMonthsClamped, compareISO, formatMonth, monthKey } from '../lib/dates';
+import { projectGoal } from '../lib/goals';
 import { newId } from '../lib/ids';
 import { formatMoney } from '../lib/money';
 import { GOAL_PRESETS, SPENDING_PRESETS } from '../lib/presets';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import type { Goal, ISODate, SpendingCategory } from '../types';
-import { GoalStatusLine, goalProjection } from './goalStatus';
+import { GoalStatusLine } from './goalStatus';
 import { useNav } from './nav';
 import { useDeleteWithUndo } from './shared';
 
@@ -73,7 +74,7 @@ export function SavingsScreen() {
         />
       ) : (
         <>
-          <ul className="list">
+          <ul className="list" role="list">
             {spending.map((s) => (
               <li key={s.id}>
                 <button type="button" className="row" onClick={() => setSheet({ kind: 'spending', item: s })}>
@@ -129,9 +130,9 @@ export function SavingsScreen() {
         />
       ) : (
         <>
-          <ul className="stack stack--sm">
+          <ul className="stack stack--sm" role="list">
             {goals.map((g) => {
-              const proj = goalProjection(g, today);
+              const proj = projectGoal(g, today);
               const reached = proj.status === 'reached';
               return (
                 <li key={g.id} className={`card goal-card${reached ? ' goal-card--done' : ''}`}>
@@ -216,7 +217,11 @@ export function SavingsScreen() {
       {celebrate && (
         <Celebration
           title="You did it!"
-          message={`You reached your ${celebrate} goal. 🎉`}
+          message={
+            <>
+              You reached your {celebrate} goal.<span aria-hidden="true"> 🎉</span>
+            </>
+          }
           onDone={() => setCelebrate(null)}
         />
       )}

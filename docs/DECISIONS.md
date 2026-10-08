@@ -29,6 +29,20 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
 - Text scales with browser zoom and the layout is checked at 125–200%. iPhone's "Larger Text" setting
   (`-apple-system-body`) isn't wired in yet; that's a future option once the layout is proven at those sizes on a real phone.
 
+## Interaction details
+- **Toasts:** 7 s when they offer Undo, 5 s otherwise; up to 3 stack; the timer pauses while a toast is touched or focused.
+  An Undo that would replace the whole budget (Smart Plan, example data, restore) closes as soon as anything else
+  changes, so later edits are never thrown away.
+- **Browser Back** closes an open dialog or sheet first, then a page.
+- **Twice-a-month paydays** must be at least a week apart (otherwise both can land on Feb 28).
+- **Debt slider** moves in $10 steps plus a stop at the exact planned extra amount; it can't go past $9,999,999.99.
+- **Field errors** are linked to their field and announced once (politely) when Save is tapped.
+- **Tab labels** wrap to two lines at most and are capped at 15px, like iOS.
+- **Backups** record their own date as "Last backup", so restoring one shows when it was made.
+- **Money input:** commas only as thousands separators ("12,50" asks for a period instead of becoming $1,250).
+- **Saving:** the app keeps exactly what was saved (tidied and validated) and refuses a change that couldn't be saved,
+  showing a message, instead of keeping it in memory where every later save would fail.
+
 ## Money & dates
 - Money is integer cents everywhere; interest rates are integer basis points (6.8% = 680).
 - Dates are local `YYYY-MM-DD` strings; helpers in `src/lib/dates.ts` avoid the UTC-parsing off-by-one-day bug.
@@ -58,6 +72,9 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
 | Growing debt first | Enough extra to pay it off within 60 months, capped at 50% of free money, but always at least enough to stop it growing | A balance that grows every month beats every other goal. |
 
 Other Smart Plan choices:
+- Every suggested amount is capped at the app's limit ($9,999,999).
+- Three kinds of debt warning: the payment is less than the interest (grows), equals it (never goes down), or there is
+  no payment set (never paid down, including 0% debts). All three get the growing-debt money first.
 - A safety net or Fun Money category is only created when there's money to put in it (an empty budget gets no suggestions).
 - $0 bills/must-haves are never listed as things to cut; $0 minimum payments are left off the Paycheck Plan.
 - A goal due later this month is not "past due": it needs the rest this month. Only a date that has gone by is past due.

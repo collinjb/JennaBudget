@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { IconCheck } from './Icons';
 import { prefersReducedMotion, useModalLayer } from './modal';
@@ -19,28 +19,50 @@ const PIECES = Array.from({ length: 36 }, (_, i) => {
   };
 });
 
+/** Closes on its own after this long, unless someone is using it with a keyboard or has a finger/pointer on it. */
+const AUTO_CLOSE_MS = 4000;
+
 interface CelebrationProps {
   title: string;
-  message?: string;
+  /** Short line under the title (decorative emoji should be wrapped in aria-hidden spans). */
+  message?: ReactNode;
   onDone: () => void;
 }
 
-/** "You did it!" moment: a big check plus confetti (just the check with reduced motion). Tap to close. */
+/**
+ * "You did it!" moment: a big check plus confetti (just the check with reduced motion), in a small dialog.
+ * Tap anywhere or "Done" to close; focus goes back to where it was.
+ */
 export function Celebration({ title, message, onDone }: CelebrationProps) {
   const btn = useRef<HTMLButtonElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const msgId = useId();
+  const [held, setHeld] = useState(false);
   const doneRef = useRef(onDone);
   useEffect(() => {
     doneRef.current = onDone;
   });
   useModalLayer(wrap, () => doneRef.current(), btn);
   useEffect(() => {
-    const t = window.setTimeout(() => doneRef.current(), 3800);
+    if (held) return;
+    const t = window.setTimeout(() => {
+      // Someone tabbing around (keyboard focus ring showing) keeps it open until they choose Done.
+      if (btn.current?.matches(':focus-visible')) return;
+      doneRef.current();
+    }, AUTO_CLOSE_MS);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [held]);
   const motion = !prefersReducedMotion();
   return createPortal(
-    <div ref={wrap} className="celebrate" role="alert">
+    <div
+      ref={wrap}
+      className="celebrate"
+      onClick={() => doneRef.current()}
+      onPointerEnter={(e) => e.pointerType === 'mouse' && setHeld(true)}
+      onTouchStart={() => setHeld(true)}
+      onKeyDown={() => setHeld(true)}
+    >
       {motion && (
         <div className="celebrate__confetti" aria-hidden="true">
           {PIECES.map((p, i) => (
@@ -63,14 +85,28 @@ export function Celebration({ title, message, onDone }: CelebrationProps) {
           ))}
         </div>
       )}
-      <button ref={btn} type="button" className="celebrate__card" onClick={() => onDone()}>
+      <div
+        className="celebrate__card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={message ? msgId : undefined}
+      >
         <span className="celebrate__check" aria-hidden="true">
           <IconCheck size={44} />
         </span>
-        <span className="celebrate__title">{title}</span>
-        {message && <span className="celebrate__msg">{message}</span>}
-        <span className="celebrate__hint">Tap to close</span>
-      </button>
+        <h2 className="celebrate__title" id={titleId}>
+          {title}
+        </h2>
+        {message && (
+          <p className="celebrate__msg" id={msgId}>
+            {message}
+          </p>
+        )}
+        <button ref={btn} type="button" className="btn btn--primary btn--block celebrate__done">
+          Done
+        </button>
+      </div>
     </div>,
     document.body,
   );

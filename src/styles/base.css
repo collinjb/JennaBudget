@@ -1,14 +1,12 @@
 /* ==========================================================================
    Base: app shell, typography, buttons, utilities.
-   (html/body sizing, overscroll and theme-color are handled by the iPhone & PWA layer.)
+   (html/body, tap highlight and touch behavior live in src/pwa/base.css; colors in tokens.css.)
    ========================================================================== */
 
-body {
-  font-size: var(--fs-body);
-  line-height: 1.4;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 button,
@@ -21,8 +19,6 @@ textarea {
 
 button {
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
 }
 
 h1,
@@ -41,10 +37,10 @@ ol {
   list-style: none;
 }
 
+/* The ring follows each control's own shape (round buttons stay round). */
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 
 .sr-only {
@@ -59,7 +55,6 @@ ol {
   border: 0;
 }
 
-.num,
 .money {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -69,6 +64,7 @@ ol {
 
 .app {
   position: relative;
+  height: 100vh; /* fallback for browsers without dvh */
   height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -86,11 +82,15 @@ ol {
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 28px);
+  padding-bottom: calc(var(--tabbar-space, var(--tabbar-h)) + var(--safe-bottom) + 28px);
+  /* A field or button that gets focus is never hidden under the tab bar (or right at the top edge). */
+  scroll-padding-top: 16px;
+  scroll-padding-bottom: calc(var(--tabbar-space, var(--tabbar-h)) + var(--safe-bottom) + 16px);
 }
 
 .app-main--page {
   padding-bottom: calc(var(--safe-bottom) + 32px);
+  scroll-padding-bottom: calc(var(--safe-bottom) + 16px);
 }
 
 .content {
@@ -143,9 +143,10 @@ ol {
 
 .section-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 2px 12px;
   margin: 12px 4px 0;
 }
 
@@ -292,11 +293,6 @@ ol {
   background: transparent;
   color: var(--link);
   padding: 0 12px;
-}
-
-.btn--danger {
-  background: #c9252b;
-  color: #fff;
 }
 
 .btn--danger-plain {

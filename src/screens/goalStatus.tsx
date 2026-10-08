@@ -1,19 +1,15 @@
 import { IconCheck, IconWarning } from '../components/Icons';
 import { formatDate, formatMonth, monthKey } from '../lib/dates';
-import { projectGoal, type GoalProjection } from '../lib/goals';
+import type { GoalProjection } from '../lib/goals';
 import { formatMoney } from '../lib/money';
-import type { Goal, ISODate } from '../types';
+import type { Goal } from '../types';
 
-export function goalProjection(goal: Goal, today: ISODate): GoalProjection {
-  return projectGoal(goal, today);
-}
-
-/** The one-line status under a goal, in plain words. */
+/** The one-line status under a goal, in plain words (a reached goal's 🎉 is added, decoratively, by GoalStatusLine). */
 export function goalStatusText(goal: Goal, p: GoalProjection): string {
   const deadline = goal.targetDate ? formatMonth(monthKey(goal.targetDate)) : '';
   switch (p.status) {
     case 'reached':
-      return '🎉 You did it!';
+      return 'You did it!';
     case 'on-track':
       return `On track for ${deadline}`;
     case 'behind':
@@ -49,7 +45,10 @@ export function GoalStatusLine({
     <p className={`goal-status${warn ? ' goal-status--warn' : ''}${good ? ' goal-status--good' : ''}${compact ? ' goal-status--compact' : ''}`}>
       {warn && <IconWarning size={16} />}
       {s === 'on-track' && <IconCheck size={16} />}
-      <span>{goalStatusText(goal, projection)}</span>
+      <span>
+        {s === 'reached' && <span aria-hidden="true">🎉 </span>}
+        {goalStatusText(goal, projection)}
+      </span>
     </p>
   );
 }

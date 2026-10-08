@@ -101,7 +101,8 @@ test.describe('Settings', () => {
     const file = JSON.parse(await readFile(path, 'utf8')) as { app: string; version: number; exportedAt: string; data: BudgetData };
     expect(file.app).toBe('budget');
     expect(file.version).toBe(1);
-    expect(file.data).toEqual(original);
+    // The file is the budget as it was, recording itself as the latest backup.
+    expect(file.data).toEqual({ ...original, settings: { ...original.settings, lastBackupAt: TODAY } });
     await expect(page.getByRole('status')).toContainText('Backup downloaded');
     await expect(page.getByText('Last backup: Oct 8.', { exact: false })).toBeVisible();
 
@@ -125,6 +126,8 @@ test.describe('Settings', () => {
     await dialog(page).getByRole('button', { name: 'Restore' }).click();
     await expect(page.getByRole('status')).toContainText('Backup restored');
     expect(await stored(page)).toEqual(file.data);
+    // Restoring your own backup doesn't forget that you made one.
+    await expect(page.getByText('Last backup: Oct 8.', { exact: false })).toBeVisible();
     await page.reload();
     await goTab(page, 'Bills');
     await expect(page.getByRole('button', { name: /^Phone,/ })).toBeVisible();

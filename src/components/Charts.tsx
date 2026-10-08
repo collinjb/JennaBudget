@@ -4,7 +4,6 @@ export type Tone = 'bills' | 'debt' | 'savings' | 'fun' | 'left' | 'over';
 
 export interface BarSegment {
   key: string;
-  label: string;
   value: number;
   tone: Tone;
 }
@@ -98,24 +97,4 @@ function downsample(values: number[], maxPoints: number): number[] {
   const step = (values.length - 1) / (maxPoints - 1);
   for (let i = 0; i < maxPoints; i++) out.push(values[Math.round(i * step)]);
   return out;
-}
-
-/** Circular progress ring (used for goals on Home). */
-export function Ring({ percent, tone = 'savings', size = 44 }: { percent: number; tone?: Tone; size?: number }) {
-  const r = 18;
-  const c = 2 * Math.PI * r;
-  const p = Math.max(0, Math.min(100, percent));
-  return (
-    <svg width={size} height={size} viewBox="0 0 44 44" className={`ring tone-${tone}`} aria-hidden="true">
-      <circle cx="22" cy="22" r={r} className="ring__track" />
-      <circle
-        cx="22"
-        cy="22"
-        r={r}
-        className="ring__fill"
-        strokeDasharray={`${(p / 100) * c} ${c}`}
-        transform="rotate(-90 22 22)"
-      />
-    </svg>
-  );
 }

@@ -24,24 +24,35 @@ export const FREQUENCY_SUFFIX: Record<AnyFrequency, string> = {
 };
 
 /**
- * Convert an amount at a frequency to a monthly amount, rounded half-up ONCE at the end.
+ * How each frequency turns into a monthly amount: × mul ÷ div. The ONE place these factors live; `toMonthly` and the
+ * in-app "How we calculate this" explainer both read them.
  * weekly ×52÷12 · biweekly ×26÷12 · semimonthly ×2 · monthly ×1 · quarterly ÷3 · yearly ÷12
  */
+export const MONTHLY_FACTORS: Record<AnyFrequency, { mul: number; div: number }> = {
+  weekly: { mul: 52, div: 12 },
+  biweekly: { mul: 26, div: 12 },
+  semimonthly: { mul: 2, div: 1 },
+  monthly: { mul: 1, div: 1 },
+  quarterly: { mul: 1, div: 3 },
+  yearly: { mul: 1, div: 12 },
+};
+
+/** Every frequency, in the order the explainer lists them (shortest to longest). */
+export const ALL_FREQUENCIES: AnyFrequency[] = ['weekly', 'biweekly', 'semimonthly', 'monthly', 'quarterly', 'yearly'];
+
+/** '× 52 ÷ 12', '× 2', '× 1', '÷ 3' (for the explainer). */
+export function factorText(freq: AnyFrequency): string {
+  const { mul, div } = MONTHLY_FACTORS[freq];
+  const parts = [mul !== 1 || div === 1 ? `× ${mul}` : '', div !== 1 ? `÷ ${div}` : ''].filter(Boolean);
+  return parts.join(' ');
+}
+
+/**
+ * Convert an amount at a frequency to a monthly amount, rounded half-up ONCE at the end (see MONTHLY_FACTORS).
+ */
 export function toMonthly(amount: Cents, freq: AnyFrequency): Cents {
-  switch (freq) {
-    case 'weekly':
-      return roundDiv(amount * 52, 12);
-    case 'biweekly':
-      return roundDiv(amount * 26, 12);
-    case 'semimonthly':
-      return amount * 2;
-    case 'monthly':
-      return amount;
-    case 'quarterly':
-      return roundDiv(amount, 3);
-    case 'yearly':
-      return roundDiv(amount, 12);
-  }
+  const { mul, div } = MONTHLY_FACTORS[freq];
+  return div === 1 ? amount * mul : roundDiv(amount * mul, div);
 }
 /** True when the monthly figure is an estimate (anything but 'monthly' and 'semimonthly'). Show "≈". */
 export function isApproxMonthly(freq: AnyFrequency): boolean {

@@ -21,14 +21,17 @@ export function PageHeader({ title, subtitle, onBack, backLabel = 'Back', right,
     <header className="page-header">
       {onBack && (
         <div className="page-header__nav">
-          <button type="button" className="back-btn" onClick={onBack}>
+          <button type="button" className="back-btn" onClick={() => onBack()}>
             <IconChevronLeft size={22} />
             <span>{backLabel}</span>
           </button>
         </div>
       )}
       <div className="page-header__row">
-        <h1 className="page-header__title">{title}</h1>
+        {/* tabIndex -1: focus moves here when a page opens, or when the thing that had focus is gone. */}
+        <h1 className="page-header__title" tabIndex={-1}>
+          {title}
+        </h1>
         {right}
         {onAdd && (
           <button type="button" className="add-pill" onClick={onAdd} aria-label={addLabel}>

@@ -1,3 +1,4 @@
+import { isValidISODate, isValidMonthKey, toISODate } from '../lib/dates';
 import { MAX_MONEY_CENTS, MAX_RATE_BPS } from '../lib/money';
 import {
   DEFAULT_SETTINGS,
@@ -307,30 +308,18 @@ const MAX_YEAR = 2999;
 export const MIN_STORED_DATE: ISODate = `${MIN_YEAR}-01-01`;
 export const MAX_STORED_DATE: ISODate = `${MAX_YEAR}-12-31`;
 
-function daysIn(year: number, month1: number): number {
-  return [31, (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][
-    month1 - 1
-  ];
+function inStoredYears(v: string): boolean {
+  const y = Number(v.slice(0, 4));
+  return y >= MIN_YEAR && y <= MAX_YEAR;
 }
 
 /** Real calendar date in 'YYYY-MM-DD' form between 1900 and 2999 (no Date parsing, so no time-zone surprises). */
 export function isStoredISODate(v: unknown): v is ISODate {
-  if (typeof v !== 'string') return false;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
-  if (!m) return false;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  return y >= MIN_YEAR && y <= MAX_YEAR && mo >= 1 && mo <= 12 && d >= 1 && d <= daysIn(y, mo);
+  return typeof v === 'string' && isValidISODate(v) && inStoredYears(v);
 }
 
 function isMonthKey(v: unknown): v is string {
-  if (typeof v !== 'string') return false;
-  const m = /^(\d{4})-(\d{2})$/.exec(v);
-  if (!m) return false;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  return y >= MIN_YEAR && y <= MAX_YEAR && mo >= 1 && mo <= 12;
+  return typeof v === 'string' && isValidMonthKey(v) && inStoredYears(v);
 }
 
 /** Reads one item's fields, throwing InvalidData with a plain-English message on the first problem. */
@@ -643,10 +632,16 @@ export interface BackupFile {
   data: BudgetData;
 }
 
-/** Backup file = { app: 'budget', version: 1, exportedAt: ISO timestamp, data: BudgetData }. */
+/**
+ * Backup file = { app: 'budget', version: 1, exportedAt: ISO timestamp, data: BudgetData }.
+ * `data.settings.lastBackupAt` is set to `today` (the date of this backup).
+ */
 export function makeBackup(data: BudgetData, today: ISODate): { filename: string; json: string } {
-  const file: BackupFile = { app: BACKUP_APP, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), data };
-  const stamp = isStoredISODate(today) ? `-${today}` : '';
+  const dated = isStoredISODate(today);
+  // The file records itself as the latest backup, so restoring it doesn't say "You haven't made a backup yet".
+  const saved = dated ? { ...data, settings: { ...data.settings, lastBackupAt: today } } : data;
+  const file: BackupFile = { app: BACKUP_APP, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), data: saved };
+  const stamp = dated ? `-${today}` : '';
   return { filename: `budget-backup${stamp}.json`, json: `${JSON.stringify(file, null, 2)}\n` };
 }
 
@@ -726,8 +721,9 @@ export async function shareOrDownloadFile(
       await nav.share({ files: [file], title });
       return 'shared';
     } catch (e) {
-      if (isAbortError(e)) return 'cancelled';
-      // e.g. NotAllowedError (no user gesture) or a share target failure: fall back to a download.
+      // Only "sharing isn't allowed here" falls back to a download. Closing the sheet (AbortError) is a cancel, and a
+      // share sheet that's already opening (InvalidStateError, e.g. a double tap) must not also start a download.
+      if (!isErrorNamed(e, 'NotAllowedError', 'TypeError')) return 'cancelled';
     }
   }
   return downloadText(filename, text, type) ? 'downloaded' : 'cancelled';
@@ -749,8 +745,10 @@ function canShareFile(nav: Navigator, file: File): boolean {
   }
 }
 
-function isAbortError(e: unknown): boolean {
-  return typeof e === 'object' && e !== null && (e as { name?: unknown }).name === 'AbortError';
+function isErrorNamed(e: unknown, ...names: string[]): boolean {
+  if (typeof e !== 'object' || e === null) return false;
+  const name = (e as { name?: unknown }).name;
+  return typeof name === 'string' && names.includes(name);
 }
 
 /** Download text as a file via a temporary <a download>. Returns false if the browser can't. */
@@ -796,10 +794,25 @@ export async function requestPersistentStorage(): Promise<boolean> {
   }
 }
 
-/** Local 'YYYY-MM-DD' for file names (independent of src/lib so recovery screens never depend on it). */
+/** Local 'YYYY-MM-DD' for file names. */
 export function localDateStamp(now: Date = new Date()): ISODate {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return toISODate(now);
+}
+
+const EXPORTED_AT_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+/** "Oct 3, 2026" (the phone's local date) from a backup's `exportedAt` timestamp; null when missing or unreadable. */
+export function formatExportedAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : EXPORTED_AT_FMT.format(new Date(t));
+}
+
+/**
+ * A restored budget that has anything in it counts as set up (settings.onboarded = true), so the welcome screen
+ * never shows over it and "Skip" there can't wipe it. Returns the same object when nothing needs to change.
+ */
+export function markOnboardedIfFilled(data: BudgetData): BudgetData {
+  const hasItems = COLLECTIONS.some((c) => data[c].length > 0);
+  return hasItems && !data.settings.onboarded ? { ...data, settings: { ...data.settings, onboarded: true } } : data;
 }

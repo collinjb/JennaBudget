@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Bill, Income } from '../types';
-import { FREQUENCY_LABELS, FREQUENCY_SUFFIX, billMonthly, incomeMonthly, isApproxMonthly, toMonthly } from './frequency';
+import {
+  ALL_FREQUENCIES,
+  FREQUENCY_LABELS,
+  FREQUENCY_SUFFIX,
+  billMonthly,
+  factorText,
+  incomeMonthly,
+  isApproxMonthly,
+  toMonthly,
+} from './frequency';
 
 describe('toMonthly', () => {
   it('weekly ×52÷12, rounded half-up once', () => {
@@ -83,5 +92,11 @@ describe('incomeMonthly / billMonthly', () => {
     };
     expect(billMonthly(bill)).toBe(1_158);
     expect(billMonthly({ ...bill, frequency: 'monthly' })).toBe(13_900);
+  });
+});
+
+describe('factorText', () => {
+  it('describes each conversion from the same factors toMonthly uses', () => {
+    expect(ALL_FREQUENCIES.map(factorText)).toEqual(['× 52 ÷ 12', '× 26 ÷ 12', '× 2', '× 1', '÷ 3', '÷ 12']);
   });
 });

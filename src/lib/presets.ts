@@ -1,4 +1,4 @@
-import type { DebtType, SpendingCategory } from '../types';
+import type { DebtType, PayoffMethod, SpendingCategory } from '../types';
 
 // Quick-add chips used by onboarding and the "add" sheets.
 
@@ -69,3 +69,15 @@ export const EMOJI_CHOICES = [
   '🛒', '⛽', '🍔', '☕', '🎉', '🎮', '👗', '💇', '🎁', '📚', '💊', '👶',
   '✈️', '🏖️', '🛟', '🚘', '💍', '🎓', '💻', '🏡', '🎄', '🐷', '💰', '📦',
 ];
+
+/** Payoff methods in plain words (Debt screen toggle and Settings). */
+export const METHOD_INFO: Record<PayoffMethod, { label: string; text: string }> = {
+  avalanche: {
+    label: 'Save the most money',
+    text: 'Pays off the highest interest rate first. You pay the least interest overall.',
+  },
+  snowball: {
+    label: 'Quick wins',
+    text: 'Pays off the smallest balance first. You knock out whole debts sooner, which feels great.',
+  },
+};

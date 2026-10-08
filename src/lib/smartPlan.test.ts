@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BudgetData, Goal } from '../types';
 import { PLAN_CONFIG } from './planConfig';
 import {
+  MAX_PLAN_AMOUNT,
   PLAN_WHY,
   applySmartPlan,
   buildSmartPlan,
@@ -11,6 +12,7 @@ import {
   type SmartPlan,
 } from './smartPlan';
 import { simulatePayoff } from './debt';
+import { MAX_MONEY_CENTS } from './money';
 import { monthlySummary } from './summary';
 import { bill, budget, debt, goal, income, spending } from './testUtils';
 
@@ -506,6 +508,36 @@ describe('extra debt vs open goals', () => {
     checkInvariants(data, plan);
   });
 
+  it('a debt whose payment only covers the interest gets rescue money with its own reason', () => {
+    // $5,000 at 24% => exactly $100 of interest; the $100 minimum keeps the balance flat.
+    const data = budget({
+      incomes: [pay(500_000)],
+      bills: [bill({ amount: 200_000 })],
+      debts: [debt({ id: 'd', name: 'Credit Card', balance: 500_000, rateBps: 2400, minPayment: 10_000 })],
+      goals: [fullEF()],
+    });
+    const plan = buildSmartPlan(data, today);
+    expect(plan.impact.monthsBefore).toBeNull();
+    expect(plan.impact.monthsAfter).not.toBeNull();
+    expect(line(plan, 'Extra debt payment').why).toBe(PLAN_WHY.debtFlat('Credit Card'));
+    checkInvariants(data, plan);
+  });
+
+  it('a debt with no monthly payment (even at 0%) gets rescue money with its own reason', () => {
+    const data = budget({
+      incomes: [pay(500_000)],
+      bills: [bill({ amount: 200_000 })],
+      debts: [debt({ id: 'd', name: 'Family Loan', type: 'personal', balance: 300_000, rateBps: 0, minPayment: 0 })],
+      goals: [fullEF(), goal({ id: 'trip', name: 'Trip', target: 500_000 })],
+    });
+    const plan = buildSmartPlan(data, today);
+    expect(plan.impact.monthsBefore).toBeNull();
+    expect(plan.impact.monthsAfter ?? Infinity).toBeLessThanOrEqual(PLAN_CONFIG.GROWING_DEBT_PAYOFF_MONTHS);
+    expect(line(plan, 'Extra debt payment').to).toBeGreaterThan(0);
+    expect(line(plan, 'Extra debt payment').why).toBe(PLAN_WHY.debtNoPayment('Family Loan'));
+    checkInvariants(data, plan);
+  });
+
   it('smallestExtraToFinish finds the exact smallest whole-dollar amount', () => {
     const d = [debt({ balance: 500_000, rateBps: 2499, minPayment: 10_000 })];
     const x = smallestExtraToFinish(d, 'avalanche', '2026-10', 60, 1_000_000) as number;
@@ -793,5 +825,60 @@ describe('split helpers', () => {
     expect(splitEquallyWithCaps(0, [2, 10])).toEqual({ gives: [0, 0], overflow: 0 });
     expect(splitEquallyWithCaps(10, [])).toEqual({ gives: [], overflow: 10 });
     expect(splitEquallyWithCaps(9, [0, 100, 100])).toEqual({ gives: [0, 5, 4], overflow: 0 });
+  });
+});
+
+describe("buildSmartPlan: huge amounts stay inside the app's money limit", () => {
+  // A $9,999,999.99 weekly paycheck is about $43 million a month: more than any one amount can hold.
+  const huge = (paychecks: number) =>
+    budget({
+      incomes: Array.from({ length: paychecks }, () =>
+        income({ amount: MAX_MONEY_CENTS, frequency: 'weekly', payDate: '2026-10-09' }),
+      ),
+      bills: [bill({ amount: MAX_MONEY_CENTS }), bill({ name: 'Mortgage', amount: MAX_MONEY_CENTS })],
+      debts: [debt({ id: 'd', name: 'Credit Card', balance: MAX_MONEY_CENTS, rateBps: 2499, minPayment: 1_000 })],
+      spending: [spending({ id: 'fun', name: 'Fun', monthly: 10_000, kind: 'fun' })],
+      goals: [goal({ id: 'yacht', name: 'Yacht', target: MAX_MONEY_CENTS })],
+    });
+
+  const expectStorable = (plan: SmartPlan) => {
+    for (const l of plan.lines) {
+      expect(l.to).toBeLessThanOrEqual(MAX_MONEY_CENTS);
+      expect(l.to % 100).toBe(0);
+    }
+    expect(plan.newGoal?.target ?? 0).toBeLessThanOrEqual(MAX_MONEY_CENTS);
+    expect(plan.newGoal?.monthly ?? 0).toBeLessThanOrEqual(MAX_MONEY_CENTS);
+  };
+
+  it('one $9,999,999.99 weekly paycheck and a huge debt: every amount fits', () => {
+    const data = huge(1);
+    const plan = buildSmartPlan(data, today);
+    expect(plan.feasible).toBe(true);
+    expectStorable(plan);
+    checkInvariants(data, plan);
+  });
+
+  it('when even more is free, each line stops at the limit and the rest stays as Left Over', () => {
+    const data = huge(3);
+    const plan = buildSmartPlan(data, today);
+    expect(MAX_PLAN_AMOUNT).toBe(999_999_900);
+    expectStorable(plan);
+    expect(plan.newGoal).toMatchObject({ target: MAX_PLAN_AMOUNT, monthly: MAX_PLAN_AMOUNT });
+    expect(line(plan, 'fun').to).toBe(MAX_PLAN_AMOUNT);
+    expect(line(plan, 'yacht').to).toBe(MAX_PLAN_AMOUNT);
+    expect(line(plan, 'Extra debt payment').to).toBe(MAX_PLAN_AMOUNT);
+    const S = monthlySummary(data);
+    const allocated = plan.lines.reduce((a, l) => a + l.to, 0);
+    expect(plan.leftOverAfter).toBe(S.income - S.bills - S.debtMinimums - S.spendingNeeds - allocated);
+    expect(plan.leftOverAfter).toBeGreaterThan(MAX_MONEY_CENTS);
+    checkInvariants(data, plan);
+
+    const applied = applySmartPlan(data, plan);
+    expect(applied.settings.extraDebtPayment).toBeLessThanOrEqual(MAX_MONEY_CENTS);
+    for (const g of applied.goals) {
+      expect(g.monthly).toBeLessThanOrEqual(MAX_MONEY_CENTS);
+      expect(g.target).toBeLessThanOrEqual(MAX_MONEY_CENTS);
+    }
+    for (const c of applied.spending) expect(c.monthly).toBeLessThanOrEqual(MAX_MONEY_CENTS);
   });
 });

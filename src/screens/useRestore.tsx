@@ -2,10 +2,8 @@ import { useRef, type ChangeEvent } from 'react';
 import { useConfirm } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
 import { useBudget } from '../state/store';
-import { parseBackup } from '../storage/storage';
+import { formatExportedAt, markOnboardedIfFilled, parseBackup } from '../storage/storage';
 import { plural } from './shared';
-
-const EXPORTED_AT_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 /**
  * "Restore from backup": a hidden file picker → validate → preview what's inside → confirm → replace,
@@ -35,17 +33,13 @@ export function useRestoreBackup() {
       return;
     }
     const sm = r.summary;
-    let when: string | null = null;
-    if (sm.exportedAt) {
-      const d = new Date(sm.exportedAt);
-      if (!Number.isNaN(d.getTime())) when = EXPORTED_AT_FMT.format(d);
-    }
+    const when = formatExportedAt(sm.exportedAt);
     const ok = await confirm({
       title: 'Restore this backup?',
       message: (
         <>
           <p>{when ? `Backup from ${when}. It has:` : 'This backup has:'}</p>
-          <ul className="restore-list">
+          <ul className="restore-list" role="list">
             <li>{plural(sm.incomes, 'paycheck')}</li>
             <li>{plural(sm.bills, 'bill')}</li>
             <li>{plural(sm.debts, 'debt')}</li>
@@ -60,8 +54,14 @@ export function useRestoreBackup() {
     });
     if (!ok) return;
     const previous = data;
-    actions.replaceAll(r.data);
-    toast.show({ message: 'Backup restored', actionLabel: 'Undo', onAction: () => actions.replaceAll(previous) });
+    // A backup with anything in it counts as set up, so the welcome screen can't show over it (or wipe it).
+    actions.replaceAll(markOnboardedIfFilled(r.data));
+    toast.show({
+      message: 'Backup restored',
+      actionLabel: 'Undo',
+      onAction: () => actions.replaceAll(previous),
+      dismissOnChange: true,
+    });
   };
 
   const input = (

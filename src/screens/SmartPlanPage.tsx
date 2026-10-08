@@ -35,9 +35,10 @@ export function SmartPlanPage() {
       message: 'Smart Plan applied',
       actionLabel: 'Undo',
       onAction: () => actions.replaceAll(previous),
-      duration: 7000,
+      dismissOnChange: true,
     });
-    nav.back();
+    // The card that opened this page has changed, so focus goes to the Home title.
+    nav.back({ focusTitle: true });
   };
 
   const unchanged = plan.lines.filter((l) => !plan.changes.includes(l));
@@ -45,7 +46,7 @@ export function SmartPlanPage() {
   return (
     <div className="content stack">
       <PageHeader
-        onBack={nav.back}
+        onBack={() => nav.back()}
         title="Smart Plan"
         subtitle="A suggested way to split your money, with the reason for each change."
       />
@@ -90,7 +91,7 @@ export function SmartPlanPage() {
               <h2 className="section-title" id="changes-title">
                 Suggested changes
               </h2>
-              <ul className="list plan-lines">
+              <ul className="list plan-lines" role="list">
                 {plan.changes.map((l) => (
                   <PlanLineRow key={`${l.kind}-${l.id ?? l.name}`} line={l} />
                 ))}
@@ -110,7 +111,7 @@ export function SmartPlanPage() {
                   <summary>
                     What stays the same ({unchanged.length}) <IconChevronDown size={18} />
                   </summary>
-                  <ul className="plan-same">
+                  <ul className="plan-same" role="list">
                     {unchanged.map((l) => (
                       <li key={`${l.kind}-${l.id ?? l.name}`}>
                         <p className="plan-same__top">
@@ -129,7 +130,7 @@ export function SmartPlanPage() {
             </>
           ) : (
             plan.lines.length > 0 && (
-              <ul className="list plan-lines">
+              <ul className="list plan-lines" role="list">
                 {plan.lines.map((l) => (
                   <PlanLineRow key={`${l.kind}-${l.id ?? l.name}`} line={l} same />
                 ))}
@@ -260,7 +261,7 @@ function Impact({ plan, goals }: { plan: SmartPlan; goals: Goal[] }) {
   );
   return (
     <Card title="With this plan" className="impact-card">
-      <ul className="impact-list">
+      <ul className="impact-list" role="list">
         {items.map((node, idx) => (
           <li key={idx}>
             <span className="impact-list__dot" aria-hidden="true" />
@@ -283,7 +284,7 @@ function Infeasible({ plan, onIncome, onBills }: { plan: SmartPlan; onIncome: ()
           <h2 className="card__title">Your bills are more than your income</h2>
         </div>
         <p className="small">
-          Right now your bills, minimum debt payments, and must-have spending add up to{' '}
+          Even before savings and fun, your bills, minimum debt payments, and must-have spending add up to{' '}
           <strong>
             <Money cents={plan.shortfall} /> more
           </strong>{' '}
@@ -295,7 +296,7 @@ function Infeasible({ plan, onIncome, onBills }: { plan: SmartPlan; onIncome: ()
           <h2 className="section-title" id="levers-title">
             Biggest things to look at
           </h2>
-          <ul className="list plan-lines">
+          <ul className="list plan-lines" role="list">
             {plan.levers.map((lv, i) => (
               <li key={`${i}-${lv.name}`} className="plan-line">
                 <div className="plan-line__top">
@@ -318,7 +319,7 @@ function Infeasible({ plan, onIncome, onBills }: { plan: SmartPlan; onIncome: ()
         </section>
       )}
       <Card title="Other ways to close the gap">
-        <ul className="impact-list">
+        <ul className="impact-list" role="list">
           <li>
             <span className="impact-list__dot" aria-hidden="true" />
             <span>Extra income, like a side gig or more hours, counts right away.</span>

@@ -2,30 +2,27 @@ import { useMemo, useState } from 'react';
 import { BigNumber } from '../components/BigNumber';
 import { BottomSheet } from '../components/BottomSheet';
 import { Card } from '../components/Card';
-import { DateInput, DayPicker, isUsableDate } from '../components/DateInput';
+import { DateInput, DayPairField, isUsableDate, semimonthlyDaysError } from '../components/DateInput';
 import { EmptyState } from '../components/EmptyState';
 import { cleanName, TextField } from '../components/Field';
 import { IconChevronDown, IconChevronRight, IconInfo } from '../components/Icons';
 import { Money } from '../components/Money';
 import { MoneyInput, useMoneyField } from '../components/MoneyInput';
 import { PageHeader } from '../components/PageHeader';
-import { Select, type Option } from '../components/Select';
+import { Select } from '../components/Select';
 import { formatDate, monthKey } from '../lib/dates';
-import { incomeMonthly, isApproxMonthly } from '../lib/frequency';
+import { ALL_FREQUENCIES, factorText, FREQUENCY_LABELS, incomeMonthly, isApproxMonthly } from '../lib/frequency';
+import { formatMoney } from '../lib/money';
 import { newId } from '../lib/ids';
 import { nextPaydays } from '../lib/schedule';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import type { Income, IncomeFrequency, ISODate } from '../types';
 import { useNav } from './nav';
-import { extraPaycheckHeadsUp, freqText, useDeleteWithUndo } from './shared';
+import { extraPaycheckHeadsUp, freqText, frequencyOptions, useDeleteWithUndo } from './shared';
 
-export const INCOME_FREQ_OPTIONS: Option<IncomeFrequency>[] = [
-  { value: 'weekly', label: 'Every week' },
-  { value: 'biweekly', label: 'Every 2 weeks' },
-  { value: 'semimonthly', label: 'Twice a month' },
-  { value: 'monthly', label: 'Every month' },
-];
+export const INCOME_FREQUENCIES: IncomeFrequency[] = ['weekly', 'biweekly', 'semimonthly', 'monthly'];
+export const INCOME_FREQ_OPTIONS = frequencyOptions(INCOME_FREQUENCIES);
 
 export function MoneyInScreen() {
   const { data } = useBudget();
@@ -73,31 +70,13 @@ export function MoneyInScreen() {
                   Months aren't exactly 4 weeks long, so we spread a whole year of paychecks evenly over 12 months.
                   That's why some numbers have a "≈".
                 </p>
-                <ul>
-                  <li>
-                    <span>Every week</span>
-                    <span>× 52 ÷ 12</span>
-                  </li>
-                  <li>
-                    <span>Every 2 weeks</span>
-                    <span>× 26 ÷ 12</span>
-                  </li>
-                  <li>
-                    <span>Twice a month</span>
-                    <span>× 2</span>
-                  </li>
-                  <li>
-                    <span>Every month</span>
-                    <span>× 1</span>
-                  </li>
-                  <li>
-                    <span>Every 3 months</span>
-                    <span>÷ 3</span>
-                  </li>
-                  <li>
-                    <span>Once a year</span>
-                    <span>÷ 12</span>
-                  </li>
+                <ul role="list">
+                  {ALL_FREQUENCIES.map((f) => (
+                    <li key={f}>
+                      <span>{FREQUENCY_LABELS[f]}</span>
+                      <span>{factorText(f)}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             </details>
@@ -114,12 +93,28 @@ export function MoneyInScreen() {
           )}
 
           <h2 className="section-title">Your paychecks</h2>
-          <ul className="list">
+          <ul className="list" role="list">
             {incomes.map((i) => {
               const next = nextPaydays([i], today, 1)[0];
+              const monthly = incomeMonthly(i);
+              const approx = isApproxMonthly(i.frequency);
+              // Read in a sensible order: "Paycheck, $1,450 every 2 weeks, about $3,141.67 a month, next payday …".
+              const label = [
+                i.name,
+                `${formatMoney(i.amount)} ${freqText(i.frequency)}`,
+                i.frequency === 'monthly' ? null : `${approx ? 'about ' : ''}${formatMoney(monthly)} a month`,
+                next ? `next payday ${formatDate(next.date, 'weekday')}` : null,
+              ]
+                .filter(Boolean)
+                .join(', ');
               return (
                 <li key={i.id}>
-                  <button type="button" className="row" onClick={() => setSheet({ income: i })}>
+                  <button
+                    type="button"
+                    className="row"
+                    aria-label={`${label}. Edit`}
+                    onClick={() => setSheet({ income: i })}
+                  >
                     <span className="row__icon" aria-hidden="true">
                       💵
                     </span>
@@ -127,7 +122,7 @@ export function MoneyInScreen() {
                       <span className="row__line">
                         <span className="row__title">{i.name}</span>
                         <span className="row__amount">
-                          <Money cents={incomeMonthly(i)} approx={isApproxMonthly(i.frequency)} />
+                          <Money cents={monthly} approx={approx} />
                         </span>
                       </span>
                       <span className="row__line row__sub">
@@ -170,8 +165,9 @@ export function IncomeSheet({ income, today, onClose }: { income: Income | null;
       setDateError('Please pick a payday.');
       ok = false;
     }
-    if (freq === 'semimonthly' && days[0] === days[1]) {
-      setDaysError('Please pick two different days.');
+    const dayProblem = freq === 'semimonthly' ? semimonthlyDaysError(days) : null;
+    if (dayProblem) {
+      setDaysError(dayProblem);
       ok = false;
     }
     if (!ok || cents === null) return false;
@@ -206,26 +202,14 @@ export function IncomeSheet({ income, today, onClose }: { income: Income | null;
       />
       <Select label="How often?" value={freq} options={INCOME_FREQ_OPTIONS} onChange={setFreq} />
       {freq === 'semimonthly' ? (
-        <div className="field-row">
-          <DayPicker
-            label="First payday"
-            lastDayLabel="last day"
-            value={days[0]}
-            onChange={(d) => {
-              setDays([d, days[1]]);
-              setDaysError(null);
-            }}
-          />
-          <DayPicker
-            label="Second payday"
-            lastDayLabel="last day"
-            value={days[1]}
-            onChange={(d) => {
-              setDays([days[0], d]);
-              setDaysError(null);
-            }}
-          />
-        </div>
+        <DayPairField
+          days={days}
+          error={daysError}
+          onChange={(d) => {
+            setDays(d);
+            setDaysError(null);
+          }}
+        />
       ) : (
         <DateInput
           label="Next payday"
@@ -237,11 +221,6 @@ export function IncomeSheet({ income, today, onClose }: { income: Income | null;
           error={dateError}
           helper={freq === 'monthly' ? 'You get paid on this day every month.' : 'Any upcoming payday works.'}
         />
-      )}
-      {daysError && (
-        <p className="field__error" role="alert">
-          {daysError}
-        </p>
       )}
     </BottomSheet>
   );

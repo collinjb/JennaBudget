@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useId, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { isSilentPop } from './history';
 import { useModalLayer } from './modal';
 
 export interface ConfirmOptions {
@@ -81,29 +82,44 @@ export function ConfirmDialog({
 type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>;
 const ConfirmContext = createContext<ConfirmFn | null>(null);
 
-/** Provides `useConfirm()`: `if (await confirm({ title: 'Delete Rent?' })) { ... }` */
+/**
+ * Provides `useConfirm()`: `if (await confirm({ title: 'Delete Rent?' })) { ... }`
+ * A new request cancels one that's still open, and Back / swipe-back cancels the open dialog.
+ */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ opts: ConfirmOptions; resolve: (v: boolean) => void; key: number } | null>(
-    null,
-  );
+  const [state, setState] = useState<{ opts: ConfirmOptions; key: number } | null>(null);
+  const pending = useRef<((v: boolean) => void) | null>(null);
   const counter = useRef(0);
+
+  const finish = useCallback((value: boolean) => {
+    const resolve = pending.current;
+    pending.current = null;
+    setState(null);
+    resolve?.(value);
+  }, []);
+
   const confirm = useCallback<ConfirmFn>(
     (opts) =>
       new Promise<boolean>((resolve) => {
+        pending.current?.(false);
+        pending.current = resolve;
         counter.current += 1;
-        const key = counter.current;
-        setState((prev) => {
-          prev?.resolve(false);
-          return { opts, resolve, key };
-        });
+        setState({ opts, key: counter.current });
       }),
     [],
   );
-  const finish = (value: boolean) => {
-    if (!state) return;
-    state.resolve(value);
-    setState(null);
-  };
+
+  // Back / swipe-back while a dialog is open cancels it (it must never float over the next screen).
+  const open = state !== null;
+  useEffect(() => {
+    if (!open) return;
+    const onPop = () => {
+      if (!isSilentPop()) finish(false);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [open, finish]);
+
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}

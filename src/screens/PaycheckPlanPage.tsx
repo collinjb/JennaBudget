@@ -9,6 +9,7 @@ import { paycheckPlan } from '../lib/schedule';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import { useNav } from './nav';
+import { ShortByNotice } from './notices';
 import { extraPaycheckHeadsUp } from './shared';
 
 export function PaycheckPlanPage() {
@@ -23,7 +24,7 @@ export function PaycheckPlanPage() {
   return (
     <div className="content stack">
       <PageHeader
-        onBack={nav.back}
+        onBack={() => nav.back()}
         title="Paycheck Plan"
         subtitle="What each paycheck needs to cover before the next one comes."
       />
@@ -46,7 +47,7 @@ export function PaycheckPlanPage() {
             </p>
           )}
 
-          <ol className="stack">
+          <ol className="stack" role="list">
             {windows.map((w, idx) => (
               <li key={w.payday.date}>
                 <Card className="window-card" data-testid={`paycheck-window-${idx}`}>
@@ -76,7 +77,7 @@ export function PaycheckPlanPage() {
                   {w.items.length === 0 ? (
                     <p className="muted small">Nothing is due. This whole paycheck is free for savings and spending.</p>
                   ) : (
-                    <ul className="mini-list">
+                    <ul className="mini-list" role="list">
                       {w.items.map((it) => (
                         <li
                           key={`${it.kind}-${it.id}-${it.date}`}
@@ -86,7 +87,11 @@ export function PaycheckPlanPage() {
                           <span className="mini-list__name ellipsis">
                             <span aria-hidden="true">{it.emoji} </span>
                             {it.name}
-                            {it.paid && <span className="badge badge--paid mini-list__badge">Paid ✓</span>}
+                            {it.paid && (
+                              <span className="badge badge--paid mini-list__badge">
+                                Paid<span aria-hidden="true"> ✓</span>
+                              </span>
+                            )}
                           </span>
                           <Money cents={it.amount} className="mini-list__amt" />
                         </li>
@@ -108,14 +113,12 @@ export function PaycheckPlanPage() {
                       </dd>
                     </div>
                   </dl>
-                  {w.shortBy > 0 && (
-                    <p className="notice notice--over">
-                      <span>
-                        ⚠️ This paycheck is short by <Money cents={w.shortBy} />. Set aside{' '}
-                        <Money cents={w.shortBy} /> from the paycheck before.
-                      </span>
+                  {w.items.some((it) => it.paid) && (
+                    <p className="muted small window-card__paid-note">
+                      Bills you've already paid still count here, since this paycheck is what pays them.
                     </p>
                   )}
+                  {w.shortBy > 0 && <ShortByNotice shortBy={w.shortBy} />}
                 </Card>
               </li>
             ))}
