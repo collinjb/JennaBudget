@@ -2,32 +2,68 @@
  * Design tokens shared by every part of the app. The Design & UI agent owns and may refine this file;
  * the iPhone & PWA agent's screens (update banner, recovery screen) use these variables too.
  * Theme: follows the iPhone by default; <html data-theme="light|dark"> forces one.
+ *
+ * Meaning colors (used consistently everywhere, always paired with text or an icon):
+ *   Bills = blue · Debt = orange · Savings = green · Spending & Fun = purple · Left over = teal · Over = red
+ * Each has a "fill" (bars, dots, rings) and an "-ink" variant (text on cards; WCAG AA on --surface and --bg).
  */
 :root {
   color-scheme: light;
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-rounded: ui-rounded, -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'SF Pro Display', system-ui,
+    'Segoe UI', Roboto, sans-serif;
 
-  --bg: #f5f6fa;
+  /* Surfaces */
+  --bg: #f2f2f7;
   --surface: #ffffff;
-  --surface-2: #eef0f5;
-  --text: #15171c;
-  --text-2: #5b6170;
-  --border: #e2e5ec;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 16px rgba(16, 24, 40, 0.06);
+  --surface-2: #f2f2f7;
+  --field: #f2f2f7;
+  --field-border: transparent;
+  --fill: rgba(118, 118, 128, 0.12);
+  --fill-strong: rgba(118, 118, 128, 0.2);
+  --text: #1c1c1e;
+  --text-2: #636366;
+  --border: #e5e5ea;
+  --separator: rgba(60, 60, 67, 0.16);
+  --backdrop: rgba(0, 0, 0, 0.32);
+  --material: rgba(249, 249, 251, 0.97);
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 20px rgba(16, 24, 40, 0.06);
+  --shadow-lg: 0 10px 40px rgba(16, 24, 40, 0.18);
+  --focus: #2563eb;
 
-  /* Meaning colors, used consistently everywhere */
+  /* Meaning colors: fills */
   --c-bills: #2f6fed;
-  --c-debt: #e0652b;
-  --c-savings: #1f9d57;
+  --c-debt: #f07a2e;
+  --c-savings: #22a55b;
   --c-fun: #8b5cf6;
-  --c-left: #0e9488;
-  --c-over: #d93636;
-  --c-warn: #b45309;
+  --c-left: #14a39a;
+  --c-over: #e5484d;
+  --c-warn: #d97706;
+  /* Meaning colors: text ("ink") */
+  --c-bills-ink: #1f5bd6;
+  --c-debt-ink: #b54708;
+  --c-savings-ink: #157a40;
+  --c-fun-ink: #6d3fe0;
+  --c-left-ink: #0a746c;
+  --c-over-ink: #c9252b;
+  --c-warn-ink: #9a5507;
+  /* Soft tints for badges / warning panels */
+  --c-over-soft: #fdecec;
+  --c-warn-soft: #fff4e0;
+  --c-savings-soft: #e7f6ed;
+  --c-left-soft: #e3f5f3;
+  --c-bills-soft: #e8effd;
 
-  --primary: #2f6fed;
+  /* Actions */
+  --primary: #2563eb;
+  --primary-pressed: #1d4fc4;
   --on-primary: #ffffff;
+  --link: #1f63e0;
+  --danger: #c9252b;
 
-  --radius: 16px;
+  /* Shape & spacing */
+  --radius: 20px;
+  --radius-md: 14px;
   --radius-sm: 10px;
   --space-1: 4px;
   --space-2: 8px;
@@ -36,53 +72,121 @@
   --space-5: 24px;
   --space-6: 32px;
   --tap: 44px;
+  --gutter: 16px;
+  --content-max: 640px;
+
+  /* Type scale (rem so browser text scaling works; 1rem = 16px) */
+  --fs-big: 3.5rem; /* 56px: the Home big number */
+  --fs-large-title: 2.125rem; /* 34px */
+  --fs-title: 1.5rem; /* 24px */
+  --fs-title-3: 1.25rem; /* 20px */
+  --fs-headline: 1.0625rem; /* 17px semibold */
+  --fs-body: 1.0625rem; /* 17px */
+  --fs-callout: 1rem; /* 16px */
+  --fs-subhead: 0.9375rem; /* 15px */
+  --fs-footnote: 0.8125rem; /* 13px */
+  --fs-caption: 0.75rem; /* 12px */
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-fast: 160ms;
+  --dur: 280ms;
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+  --tabbar-h: 54px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bg: #0e0f13;
-    --surface: #1a1c22;
-    --surface-2: #24262e;
-    --text: #f2f3f7;
-    --text-2: #a3a8b6;
-    --border: #2e313b;
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --field: #2c2c2e;
+    --field-border: transparent;
+    --fill: rgba(118, 118, 128, 0.24);
+    --fill-strong: rgba(118, 118, 128, 0.36);
+    --text: #f5f5f7;
+    --text-2: #a1a1a8;
+    --border: #38383a;
+    --separator: rgba(84, 84, 88, 0.6);
+    --backdrop: rgba(0, 0, 0, 0.55);
+    --material: rgba(22, 22, 24, 0.97);
     --shadow: none;
-    --c-bills: #6b9bff;
-    --c-debt: #ff8a50;
-    --c-savings: #3ccf7e;
-    --c-fun: #b294ff;
+    --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.6);
+    --focus: #6ea0ff;
+    --c-bills: #5b8cff;
+    --c-debt: #ff8a4c;
+    --c-savings: #34c77b;
+    --c-fun: #a98bff;
     --c-left: #2dd4bf;
-    --c-over: #ff6b6b;
+    --c-over: #ff6369;
     --c-warn: #fbbf24;
-    --primary: #6b9bff;
-    --on-primary: #0b1020;
+    --c-bills-ink: #82a8ff;
+    --c-debt-ink: #ffa270;
+    --c-savings-ink: #4cd98e;
+    --c-fun-ink: #bba3ff;
+    --c-left-ink: #2dd4bf;
+    --c-over-ink: #ff7b80;
+    --c-warn-ink: #fbbf24;
+    --c-over-soft: rgba(255, 99, 105, 0.14);
+    --c-warn-soft: rgba(251, 191, 36, 0.13);
+    --c-savings-soft: rgba(52, 199, 123, 0.14);
+    --c-left-soft: rgba(45, 212, 191, 0.13);
+    --c-bills-soft: rgba(91, 140, 255, 0.16);
+    --primary: #2563eb;
+    --primary-pressed: #1d4fc4;
+    --on-primary: #ffffff;
+    --link: #6ea0ff;
+    --danger: #ff7b80;
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #0e0f13;
-  --surface: #1a1c22;
-  --surface-2: #24262e;
-  --text: #f2f3f7;
-  --text-2: #a3a8b6;
-  --border: #2e313b;
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --field: #2c2c2e;
+  --field-border: transparent;
+  --fill: rgba(118, 118, 128, 0.24);
+  --fill-strong: rgba(118, 118, 128, 0.36);
+  --text: #f5f5f7;
+  --text-2: #a1a1a8;
+  --border: #38383a;
+  --separator: rgba(84, 84, 88, 0.6);
+  --backdrop: rgba(0, 0, 0, 0.55);
+  --material: rgba(22, 22, 24, 0.97);
   --shadow: none;
-  --c-bills: #6b9bff;
-  --c-debt: #ff8a50;
-  --c-savings: #3ccf7e;
-  --c-fun: #b294ff;
+  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.6);
+  --focus: #6ea0ff;
+  --c-bills: #5b8cff;
+  --c-debt: #ff8a4c;
+  --c-savings: #34c77b;
+  --c-fun: #a98bff;
   --c-left: #2dd4bf;
-  --c-over: #ff6b6b;
+  --c-over: #ff6369;
   --c-warn: #fbbf24;
-  --primary: #6b9bff;
-  --on-primary: #0b1020;
+  --c-bills-ink: #82a8ff;
+  --c-debt-ink: #ffa270;
+  --c-savings-ink: #4cd98e;
+  --c-fun-ink: #bba3ff;
+  --c-left-ink: #2dd4bf;
+  --c-over-ink: #ff7b80;
+  --c-warn-ink: #fbbf24;
+  --c-over-soft: rgba(255, 99, 105, 0.14);
+  --c-warn-soft: rgba(251, 191, 36, 0.13);
+  --c-savings-soft: rgba(52, 199, 123, 0.14);
+  --c-left-soft: rgba(45, 212, 191, 0.13);
+  --c-bills-soft: rgba(91, 140, 255, 0.16);
+  --primary: #2563eb;
+  --primary-pressed: #1d4fc4;
+  --on-primary: #ffffff;
+  --link: #6ea0ff;
+  --danger: #ff7b80;
 }
 
 html,
@@ -92,6 +196,7 @@ body {
   color: var(--text);
   font-family: var(--font);
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MAX_MONEY_CENTS } from '../lib/money';
 import { clearData, loadData, saveData } from '../storage/storage';
 import {
@@ -62,28 +62,25 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<BudgetData>(init.data);
   const [status, setStatus] = useState<StoreStatus>(init.status);
   const [saveError, setSaveError] = useState<string | null>(null);
-  // Latest data for synchronous reads inside actions (kept in sync by `update`).
+  // Latest data/status for synchronous reads inside actions (so back-to-back actions build on each other).
   const dataRef = useRef(init.data);
-  const skipFirstSave = useRef(true);
+  const statusRef = useRef(init.status);
 
-  // Persist every change (but never overwrite unreadable data until the user resolves it).
-  useEffect(() => {
-    if (skipFirstSave.current) {
-      skipFirstSave.current = false;
-      return;
-    }
-    if (status !== 'ready') return;
-    const res = saveData(data);
-    setSaveError(res.ok ? null : res.error);
-  }, [data, status]);
-
-  const update = useCallback((fn: (d: BudgetData) => BudgetData) => {
-    setData((d) => {
-      const next = fn(d);
-      dataRef.current = next;
-      return next;
-    });
+  const markReady = useCallback(() => {
+    statusRef.current = 'ready';
+    setStatus('ready');
   }, []);
+
+  // Every change is saved right away (but unreadable data is never overwritten until the user resolves it).
+  const commit = useCallback((next: BudgetData) => {
+    dataRef.current = next;
+    setData(next);
+    if (statusRef.current !== 'ready') return;
+    const res = saveData(next);
+    setSaveError(res.ok ? null : res.error);
+  }, []);
+
+  const update = useCallback((fn: (d: BudgetData) => BudgetData) => commit(fn(dataRef.current)), [commit]);
 
   const actions = useMemo<BudgetActions>(
     () => ({
@@ -116,8 +113,8 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         update((d) => ({ ...d, settings: { ...d.settings, ...patch } }));
       },
       replaceAll(next) {
-        update(() => next);
-        setStatus('ready');
+        markReady();
+        commit(next);
       },
       setBillPaid(id, month) {
         update((d) => ({ ...d, bills: d.bills.map((b) => (b.id === id ? { ...b, paidMonth: month } : b)) }));
@@ -132,11 +129,11 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       },
       reset() {
         clearData();
-        update(() => emptyBudget());
-        setStatus('ready');
+        markReady();
+        commit(emptyBudget());
       },
     }),
-    [update],
+    [update, commit, markReady],
   );
 
   const value = useMemo<StoreValue>(

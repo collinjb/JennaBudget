@@ -1,0 +1,376 @@
+/* ==========================================================================
+   Base: app shell, typography, buttons, utilities.
+   (html/body sizing, overscroll and theme-color are handled by the iPhone & PWA layer.)
+   ========================================================================== */
+
+body {
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.num,
+.money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- App shell ---------- */
+
+.app {
+  position: relative;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  padding-top: var(--safe-top);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+.app-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 28px);
+}
+
+.app-main--page {
+  padding-bottom: calc(var(--safe-bottom) + 32px);
+}
+
+.content {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stack--sm {
+  gap: 10px;
+}
+
+.view-enter {
+  animation: view-in var(--dur) var(--ease-out) both;
+}
+
+.page-enter {
+  animation: page-in 320ms var(--ease-out) both;
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0.4;
+    transform: translateX(28%);
+  }
+}
+
+/* ---------- Text ---------- */
+
+.section-title {
+  font-size: var(--fs-title-3);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 10px 4px 0;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 4px 0;
+}
+
+.section-head .section-title {
+  margin: 0;
+}
+
+.section-head__aside {
+  color: var(--text-2);
+  font-size: var(--fs-subhead);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.section-note {
+  color: var(--text-2);
+  font-size: var(--fs-subhead);
+  margin: -8px 4px 0;
+}
+
+.muted {
+  color: var(--text-2);
+}
+
+.small {
+  font-size: var(--fs-subhead);
+}
+
+.footnote {
+  font-size: var(--fs-footnote);
+  color: var(--text-2);
+  text-align: center;
+  padding: 0 12px;
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tone-left {
+  color: var(--c-left-ink);
+}
+.tone-over {
+  color: var(--c-over-ink);
+}
+.tone-bills {
+  color: var(--c-bills-ink);
+}
+.tone-debt {
+  color: var(--c-debt-ink);
+}
+.tone-savings {
+  color: var(--c-savings-ink);
+}
+.tone-fun {
+  color: var(--c-fun-ink);
+}
+.tone-warn {
+  color: var(--c-warn-ink);
+}
+.tone-plain {
+  color: var(--text);
+}
+
+.fill-bills {
+  background: var(--c-bills);
+}
+.fill-debt {
+  background: var(--c-debt);
+}
+.fill-savings {
+  background: var(--c-savings);
+}
+.fill-fun {
+  background: var(--c-fun);
+}
+.fill-left {
+  background: var(--c-left);
+}
+.fill-over {
+  background: var(--c-over);
+}
+.fill-warn {
+  background: var(--c-warn);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    transform var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    opacity var(--dur-fast) ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.btn--primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.btn--primary:active {
+  background: var(--primary-pressed);
+}
+
+.btn--secondary {
+  background: var(--c-bills-soft);
+  color: var(--link);
+}
+
+.btn--gray {
+  background: var(--fill);
+  color: var(--text);
+}
+
+.btn--plain {
+  background: transparent;
+  color: var(--link);
+  padding: 0 12px;
+}
+
+.btn--danger {
+  background: #c9252b;
+  color: #fff;
+}
+
+.btn--danger-plain {
+  background: transparent;
+  color: var(--danger);
+}
+
+.btn--block {
+  display: flex;
+  width: 100%;
+}
+
+.btn--lg {
+  min-height: 54px;
+  font-size: 1.125rem;
+}
+
+.btn--sm {
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: var(--fs-subhead);
+  border-radius: 12px;
+}
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-row > .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font-weight: 600;
+  font-size: var(--fs-body);
+  text-align: left;
+}
+
+/* Small round icon button (gear) */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.icon-btn:active {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
