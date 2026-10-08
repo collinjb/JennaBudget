@@ -11,3 +11,4 @@ screenshots
 .netlify
 .vercel
 .wrangler
+dist-*
