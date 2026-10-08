@@ -13,6 +13,7 @@ how much is left over, when you'll be debt-free, and a Smart Plan for splitting 
 4. Tap **Add**.
 
 The **Budget** icon is now on your home screen. It opens full-screen like a normal app and works without internet.
+Needs iOS 16.4 or newer (any iPhone from the last several years, kept up to date).
 
 Tip: on your computer, open `docs/qr.png` and point your iPhone camera at it to open the link.
 

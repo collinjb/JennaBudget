@@ -23,7 +23,9 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
 - `navigator.storage.persist()` is requested on startup (best effort). Home-screen apps are also exempt from Safari's
   7-day storage cleanup.
 
-- **Minimum iOS: 16.2 or later.** The app uses `dvh` units, `color-mix()` and `inert` (with a `100vh` fallback).
+- **Minimum iOS: 16.4 or later** (the build's browser target; the app also uses `dvh` units, `color-mix()` and `inert`).
+- Always link to the address **with the trailing slash** (`/JennaBudget/`); without it the page is outside the offline
+  service worker's scope.
 - Text scales with browser zoom and the layout is checked at 125–200%. iPhone's "Larger Text" setting
   (`-apple-system-body`) isn't wired in yet; that's a future option once the layout is proven at those sizes on a real phone.
 
