@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MAX_MONEY_CENTS } from '../lib/money';
-import { clearData, loadData, saveData } from '../storage/storage';
+import { clearData, loadData, saveData, validateBudget } from '../storage/storage';
 import {
   emptyBudget,
   type BudgetData,
@@ -43,6 +43,8 @@ interface StoreValue {
   status: StoreStatus;
   /** Raw text of unreadable saved data (status 'corrupt'), so it can be offered for download. */
   corruptRaw: string | null;
+  /** Why the saved data couldn't be read (status 'corrupt'), e.g. it was saved by a newer version. */
+  corruptError: string | null;
   /** Last save error (e.g. storage full / private mode), or null. */
   saveError: string | null;
   actions: BudgetActions;
@@ -50,11 +52,29 @@ interface StoreValue {
 
 const StoreContext = createContext<StoreValue | null>(null);
 
-function initialState(): { data: BudgetData; status: StoreStatus; corruptRaw: string | null } {
+interface InitialState {
+  data: BudgetData;
+  status: StoreStatus;
+  corruptRaw: string | null;
+  corruptError: string | null;
+}
+
+function initialState(): InitialState {
   const result = loadData();
-  if (result.status === 'ok') return { data: result.data, status: 'ready', corruptRaw: null };
-  if (result.status === 'corrupt') return { data: emptyBudget(), status: 'corrupt', corruptRaw: result.raw };
-  return { data: emptyBudget(), status: 'ready', corruptRaw: null };
+  if (result.status === 'ok') return { data: result.data, status: 'ready', corruptRaw: null, corruptError: null };
+  if (result.status === 'corrupt') {
+    return { data: emptyBudget(), status: 'corrupt', corruptRaw: result.raw, corruptError: result.error };
+  }
+  return { data: emptyBudget(), status: 'ready', corruptRaw: null, corruptError: null };
+}
+
+/** Once every debt is paid off, a planned extra payment no longer means anything; drop it so it can't come back
+ * silently (and quietly lower Left Over) when a new debt is added later. */
+function withoutStaleExtra(d: BudgetData): BudgetData {
+  if (d.settings.extraDebtPayment > 0 && !d.debts.some((x) => x.balance > 0)) {
+    return { ...d, settings: { ...d.settings, extraDebtPayment: 0 } };
+  }
+  return d;
 }
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
@@ -72,11 +92,19 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Every change is saved right away (but unreadable data is never overwritten until the user resolves it).
+  // Memory always holds exactly what storage would keep (validated and tidied), and a change that couldn't be
+  // saved is refused instead of kept: keeping it would make every later save fail too.
   const commit = useCallback((next: BudgetData) => {
-    dataRef.current = next;
-    setData(next);
+    const v = validateBudget(next);
+    if (!v.ok) {
+      setSaveError(`That change couldn't be made because something in it isn't right. ${v.error}`);
+      return;
+    }
+    const clean = withoutStaleExtra(v.data);
+    dataRef.current = clean;
+    setData(clean);
     if (statusRef.current !== 'ready') return;
-    const res = saveData(next);
+    const res = saveData(clean);
     setSaveError(res.ok ? null : res.error);
   }, []);
 
@@ -104,8 +132,16 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         update((d) => {
           const list = d[removed.collection] as CollectionItem<typeof removed.collection>[];
           if (list.some((x) => x.id === removed.item.id)) return d;
+          let item = removed.item;
+          // Only one safety net: if another one was added meanwhile, the restored goal comes back as a normal goal.
+          if (removed.collection === 'goals') {
+            const goal = item as CollectionItem<'goals'>;
+            if (goal.isEmergencyFund && d.goals.some((g) => g.isEmergencyFund)) {
+              item = { ...goal, isEmergencyFund: false } as typeof item;
+            }
+          }
           const next = [...list];
-          next.splice(Math.min(removed.index, next.length), 0, removed.item);
+          next.splice(Math.min(removed.index, next.length), 0, item);
           return { ...d, [removed.collection]: next };
         });
       },
@@ -137,8 +173,8 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<StoreValue>(
-    () => ({ data, status, corruptRaw: init.corruptRaw, saveError, actions }),
-    [data, status, init.corruptRaw, saveError, actions],
+    () => ({ data, status, corruptRaw: init.corruptRaw, corruptError: init.corruptError, saveError, actions }),
+    [data, status, init.corruptRaw, init.corruptError, saveError, actions],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

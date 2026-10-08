@@ -16,6 +16,7 @@ export const MONEY_ERRORS = {
   decimals: 'Please use at most 2 decimal places, like 25.50',
   tooBig: "That's more than this app can handle",
   zero: "Amount can't be zero",
+  comma: 'Use a period for cents, like 12.50',
 } as const;
 
 export const RATE_ERRORS = {
@@ -42,25 +43,47 @@ function splitDecimal(s: string): { whole: string; frac: string } | null {
   return { whole: whole.replace(/^0+(?=\d)/, ''), frac };
 }
 
+/** Commas are only accepted as thousands separators: "1,234" or "12,345,678.90". */
+const THOUSANDS_RE = /^\d{1,3}(?:,\d{3})+(?:\.\d*)?$/;
+const MINUS_RE = /^[-−]/;
+
 /**
- * Parse user-typed money. Accepts "$1,234.56", "1234.5", "1234", " 12 ", ".5".
- * Strips "$", commas, spaces. Rejects negatives, letters, >2 decimals, empty, > MAX_MONEY_CENTS.
- * Errors are short plain-English sentences, e.g. "Please enter an amount like 25 or 25.50".
+ * Parse user-typed money. Accepts "$1,234.56", "1234.5", "1234", " 12 ", ".5", "$ 12".
+ * One leading "$" and surrounding spaces are fine; commas only as thousands separators (so "12,50" — a comma used
+ * for cents — is an error, never $1,250). Rejects negatives, letters, inner spaces, >2 decimals, empty,
+ * > MAX_MONEY_CENTS. Errors are short plain-English sentences, e.g. "Please enter an amount like 25 or 25.50".
  * opts.allowZero defaults to true. opts.max defaults to MAX_MONEY_CENTS.
  */
 export function parseMoney(input: string, opts?: { allowZero?: boolean; max?: Cents }): MoneyParseResult {
   const allowZero = opts?.allowZero ?? true;
   const max = opts?.max ?? MAX_MONEY_CENTS;
-  const cleaned = String(input ?? '').replace(/[\s$,]/g, '');
-  if (cleaned === '') return { ok: false, error: MONEY_ERRORS.empty };
-  if (/^[-−]/.test(cleaned) || /^\(.*\)$/.test(cleaned)) {
-    // Only call it "negative" if the rest looks like a number.
-    const rest = cleaned.replace(/^[-−]/, '').replace(/^\((.*)\)$/, '$1');
-    if (splitDecimal(rest)) return { ok: false, error: MONEY_ERRORS.negative };
-    return { ok: false, error: MONEY_ERRORS.format };
+  let s = String(input ?? '').trim();
+  let negative = false;
+  if (/^\(.*\)$/.test(s)) {
+    negative = true;
+    s = s.slice(1, -1).trim();
   }
-  const parts = splitDecimal(cleaned);
+  if (MINUS_RE.test(s)) {
+    negative = true;
+    s = s.slice(1).trim();
+  }
+  if (s.startsWith('$')) s = s.slice(1).trim();
+  if (MINUS_RE.test(s)) {
+    negative = true;
+    s = s.slice(1).trim();
+  }
+  if (s === '') return { ok: false, error: negative ? MONEY_ERRORS.format : MONEY_ERRORS.empty };
+  if (/[\s$]/.test(s)) return { ok: false, error: MONEY_ERRORS.format };
+  if (s.includes(',')) {
+    if (!THOUSANDS_RE.test(s)) {
+      // Most likely a comma used for cents ("12,50"); only call it that if it's otherwise a number.
+      return { ok: false, error: /^[\d,.]+$/.test(s) ? MONEY_ERRORS.comma : MONEY_ERRORS.format };
+    }
+    s = s.replace(/,/g, '');
+  }
+  const parts = splitDecimal(s);
   if (!parts) return { ok: false, error: MONEY_ERRORS.format };
+  if (negative) return { ok: false, error: MONEY_ERRORS.negative };
   if (parts.frac.length > 2) return { ok: false, error: MONEY_ERRORS.decimals };
   // Anything with more than 13 whole-dollar digits is far beyond any sane max; avoid precision issues.
   if (parts.whole.length > 13) return { ok: false, error: tooBigError(max) };

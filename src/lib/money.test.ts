@@ -40,14 +40,15 @@ describe('parseMoney', () => {
     ['.05', 5],
     ['0.01', 1],
     ['1,000', 100000],
-    ['1,2,3', 12300], // misplaced commas are accepted loosely (just stripped)
+    ['1,000.50', 100050],
+    ['1,234,567.89', 123_456_789],
     ['$ 25', 2500],
     ['25.', 2500],
     ['0', 0],
     ['0.00', 0],
     ['007', 700],
     ['$9,999,999.99', 999_999_999],
-    ['  $1 450  ', 145000],
+    ['  $1,450  ', 145000],
     ['\t42\n', 4200],
   ])('accepts %j => %i cents', (input, cents) => {
     expect(ok(input)).toBe(cents);
@@ -84,6 +85,18 @@ describe('parseMoney', () => {
     ['$10,000,000', MONEY_ERRORS.tooBig],
     ['10000000.00', MONEY_ERRORS.tooBig],
     ['99999999999999999999', MONEY_ERRORS.tooBig],
+    // A comma is only a thousands separator; as a decimal mark it would make the amount 100x too big.
+    ['12,50', MONEY_ERRORS.comma],
+    ['12,34', MONEY_ERRORS.comma],
+    ['1,23', MONEY_ERRORS.comma],
+    ['1,2,3', MONEY_ERRORS.comma],
+    ['1,0000', MONEY_ERRORS.comma],
+    [',5', MONEY_ERRORS.comma],
+    ['1 234', MONEY_ERRORS.format],
+    ['12\n34', MONEY_ERRORS.format],
+    ['$$5', MONEY_ERRORS.format],
+    ['5$', MONEY_ERRORS.format],
+    ['(5)', MONEY_ERRORS.negative],
   ])('rejects %j', (input, error) => {
     expect(err(input)).toBe(error);
   });
