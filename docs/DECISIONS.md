@@ -23,6 +23,10 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
 - `navigator.storage.persist()` is requested on startup (best effort). Home-screen apps are also exempt from Safari's
   7-day storage cleanup.
 
+- **Minimum iOS: 16.2 or later.** The app uses `dvh` units, `color-mix()` and `inert` (with a `100vh` fallback).
+- Text scales with browser zoom and the layout is checked at 125–200%. iPhone's "Larger Text" setting
+  (`-apple-system-body`) isn't wired in yet; that's a future option once the layout is proven at those sizes on a real phone.
+
 ## Money & dates
 - Money is integer cents everywhere; interest rates are integer basis points (6.8% = 680).
 - Dates are local `YYYY-MM-DD` strings; helpers in `src/lib/dates.ts` avoid the UTC-parsing off-by-one-day bug.
@@ -48,4 +52,10 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
 | Fun money | 10% of take-home (5% when free money < 15% of income), never more than half of free money | Budgets with zero fun get abandoned. |
 | Buffer | min($100, 10% of what's left) | Small cushion for surprises. |
 | Extra debt share | 75% with high-interest debt · 50% mid-rate · 25% low-rate only | Remainder goes to goals without a deadline. |
-| Change threshold | $5 | Avoids nagging about tiny differences. |
+| Change threshold | $5 | The Home card only nudges about $5+ moves. The Smart Plan page still lists every change, so nothing changes silently. |
+| Growing debt first | Enough extra to pay it off within 60 months, capped at 50% of free money, but always at least enough to stop it growing | A balance that grows every month beats every other goal. |
+
+Other Smart Plan choices:
+- A safety net or Fun Money category is only created when there's money to put in it (an empty budget gets no suggestions).
+- $0 bills/must-haves are never listed as things to cut; $0 minimum payments are left off the Paycheck Plan.
+- A goal due later this month is not "past due": it needs the rest this month. Only a date that has gone by is past due.

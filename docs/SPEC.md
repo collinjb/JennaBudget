@@ -88,7 +88,8 @@ All in `src/lib`. Integer cents only; round half-up once at the end of each conv
   "Your $25 payment doesn't cover the $31 of interest each month, so this balance will keep growing."
 - **Goals** (`projectGoal`): first contribution next month. months to goal = ceil(remaining ÷ monthly); reach month =
   current month + that. With a deadline: monthsLeft = targetMonth − currentMonth; needed/month = ceil(remaining ÷
-  monthsLeft); `on-track` if monthly ≥ needed, else `behind`; deadline this month or earlier and not reached → `past-due`.
+  monthsLeft) (deadline later this month: needed = everything left); `on-track` if monthly ≥ needed, else `behind`;
+  deadline date before today and not reached → `past-due`.
 
 ---
 
@@ -106,6 +107,9 @@ if R < 0 → feasible=false, shortfall=−R, levers = biggest bills + must-have 
            (max 4, desc), lines=[], changes=[], hasSuggestions=false. Impact before = after (current).
 tight = R < income × TIGHT_RATIO
 
+0) Growing debt (minimum ≤ monthly interest). rescue = max(smallest extra that pays those debts off within 600 months,
+   min(smallest extra that pays them off within GROWING_DEBT_PAYOFF_MONTHS, floorDollars(R × GROWING_DEBT_MAX_SHARE))),
+   never more than floorDollars(R).  R −= rescue.  (Added to the extra-debt line; why = "doesn't cover its interest".)
 A) Safety net. ef = first goal with isEmergencyFund.
    If none: newGoal = { name 'Emergency Fund', emoji '🛟', target = max(STARTER_EMERGENCY_FUND, ceil-to-$100(fixed)),
    saved 0, targetDate null, isEmergencyFund true }.
@@ -129,7 +133,8 @@ leftOverAfter = income − fixed − everything allocated above.
 
 **Lines** (every adjustable item, `from` = current, `to` = suggested): EF (existing or new), each fun category
 (+ newSpending), each goal from D/E/F, and `extraDebt` (only when active debts exist). Reached non-EF goals are not
-listed. **Changes** = lines with |to − from| ≥ MIN_CHANGE, plus new items. `hasSuggestions = feasible && changes.length > 0`.
+listed. **Changes** = every line whose amount changes, plus new items (nothing changes silently).
+`hasSuggestions = feasible && some change moves ≥ MIN_CHANGE or adds an item` (drives the Home nudge).
 
 **Why sentences** (one plain sentence each, no jargon; examples):
 - New safety net: "A $1,000 safety net keeps a surprise, like a car repair, from turning into new debt."
