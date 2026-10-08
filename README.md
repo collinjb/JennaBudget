@@ -28,7 +28,7 @@ New phones and browsers ask for a 4-digit code once, then go straight to the bud
 
 ## Your data (please read)
 
-- **Everything stays on your phone.** No account, no login, nothing is sent anywhere.
+- **Everything stays on your phone.** No account, and nothing is sent anywhere.
 - **Use the home-screen icon, not a Safari tab.** iPhone keeps them separate, so data typed into a Safari tab won't show up
   in the home-screen app (and the other way around).
 - **Back up every week or two:** open the app → ⚙️ Settings → **Back up my data** → save the file to iCloud Drive (Files),
