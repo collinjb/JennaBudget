@@ -100,6 +100,25 @@ export interface Goal {
   monthDeposit: { month: MonthKey; amount: Cents } | null;
 }
 
+export type AccountType = 'savings' | 'checking' | 'roth' | 'retirement' | 'investment' | 'other';
+
+/** Money you have: a bank account, Roth IRA, retirement (e.g. SERS) or investment account. Counts toward net worth. */
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;
+  balance: Cents;
+  /** When the balance was last updated. */
+  updatedAt: ISODate;
+}
+
+/** One credit score check (300–850). */
+export interface CreditScore {
+  id: string;
+  score: number;
+  date: ISODate;
+}
+
 export type PayoffMethod = 'avalanche' | 'snowball';
 export type ThemeSetting = 'system' | 'light' | 'dark';
 
