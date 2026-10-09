@@ -113,8 +113,8 @@ export function makeExampleBudget(today: ISODate): BudgetData {
   const accounts: Account[] = [
     { id: newId(), name: 'Checking', type: 'checking', balance: 90_000, updatedAt: today },
     { id: newId(), name: 'Savings', type: 'savings', balance: 215_000, updatedAt: today },
-    { id: newId(), name: 'Roth IRA', type: 'roth', balance: 640_000, updatedAt: inMonth(-1, 28) },
-    { id: newId(), name: 'SERS', type: 'retirement', balance: 1_180_000, updatedAt: inMonth(-1, 28) },
+    { id: newId(), name: 'Roth IRA', type: 'roth', balance: 920_000, updatedAt: inMonth(-1, 28) },
+    { id: newId(), name: 'SERS', type: 'retirement', balance: 1_840_000, updatedAt: inMonth(-1, 28) },
   ];
 
   // A rising score over the last few months, to show the history and the change.

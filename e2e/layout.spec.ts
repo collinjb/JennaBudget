@@ -37,6 +37,10 @@ test.describe('Layout: no horizontal scrolling', () => {
     await page.getByTestId('plan-card').getByRole('button').first().click();
     await expect(page.getByRole('heading', { level: 1, name: 'Smart Plan' })).toBeVisible();
     await expectNoHorizontalScroll(page, 'Smart Plan');
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await page.getByTestId('home-networth').getByRole('button').click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Net worth' })).toBeVisible();
+    await expectNoHorizontalScroll(page, 'Net worth');
   }
 
   test('every screen with the example budget', async ({ page }) => {

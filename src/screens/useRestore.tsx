@@ -45,6 +45,8 @@ export function useRestoreBackup() {
             <li>{plural(sm.debts, 'debt')}</li>
             <li>{plural(sm.spending, 'spending category', 'spending categories')}</li>
             <li>{plural(sm.goals, 'savings goal')}</li>
+            {sm.accounts > 0 && <li>{plural(sm.accounts, 'account')}</li>}
+            {sm.creditScores > 0 && <li>{plural(sm.creditScores, 'credit score')}</li>}
           </ul>
           <p>It replaces everything on this phone right now.</p>
         </>

@@ -46,7 +46,14 @@ export function SettingsPage() {
 
   const loadExample = async () => {
     const hasData =
-      data.incomes.length + data.bills.length + data.debts.length + data.spending.length + data.goals.length > 0;
+      data.incomes.length +
+        data.bills.length +
+        data.debts.length +
+        data.spending.length +
+        data.goals.length +
+        data.accounts.length +
+        data.creditScores.length >
+      0;
     if (hasData) {
       const ok = await confirm({
         title: 'Load the example budget?',
@@ -82,7 +89,8 @@ export function SettingsPage() {
   const startOver = async () => {
     const first = await confirm({
       title: 'Start over?',
-      message: 'This erases everything in Budget on this phone: paychecks, bills, debts, savings, and settings.',
+      message:
+        'This erases everything in Budget on this phone: paychecks, bills, debts, savings, accounts, credit scores, and settings.',
       confirmLabel: 'Continue',
       destructive: true,
     });

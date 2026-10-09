@@ -6,6 +6,8 @@ export interface Option<T extends string> {
   value: T;
   label: string;
   hint?: string;
+  /** ChoiceList only: a decorative icon in front of the label (hidden from screen readers). */
+  emoji?: string;
 }
 
 interface SelectProps<T extends string> {
@@ -129,6 +131,11 @@ export function ChoiceList<T extends string>({ label, value, options, onChange, 
                 checked={checked}
                 onChange={() => onChange(o.value)}
               />
+              {o.emoji && (
+                <span className="choice__emoji" aria-hidden="true">
+                  {o.emoji}
+                </span>
+              )}
               <span className="choice__text">
                 <span className="choice__label">{o.label}</span>
                 {o.hint && <span className="choice__hint">{o.hint}</span>}

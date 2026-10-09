@@ -10,6 +10,7 @@ import { formatDate, formatDuration, formatMonth, monthKey } from '../lib/dates'
 import { debtsThisMonth, interestWarnings } from '../lib/debt';
 import { projectGoal } from '../lib/goals';
 import { ceilDollars, formatMoney } from '../lib/money';
+import { netWorth, scoreSummary } from '../lib/networth';
 import { paycheckPlan, type PaycheckWindow } from '../lib/schedule';
 import { buildSmartPlan } from '../lib/smartPlan';
 import { homeBreakdown, monthlySummary, type BreakdownKey } from '../lib/summary';
@@ -18,6 +19,7 @@ import { useToday } from '../state/useToday';
 import { DEFAULT_SETTINGS, emptyBudget } from '../types';
 import { GoalMonthLine, GoalStatusLine } from './goalStatus';
 import { useNav } from './nav';
+import { BandBadge, signedMoney } from './netWorthParts';
 import { GOALS_SHORT_TITLE, GoalsShortText, InterestWarningNotice, ShortByNotice } from './notices';
 
 const PARTS: { key: BreakdownKey; label: string; tone: Tone }[] = [
@@ -373,10 +375,65 @@ export function HomeScreen() {
         </Card>
       )}
 
+      {/* 7. Net worth & credit score */}
+      <NetWorthCard onOpen={() => nav.openPage('networth')} />
+
       {!hasIncome && (
         <p className="footnote">Tip: start with Money In, then add your bills. The big number fills in as you go.</p>
       )}
     </div>
+  );
+}
+
+/** Net worth and the latest credit score at a glance, or a short invite to start tracking them. */
+function NetWorthCard({ onOpen }: { onOpen: () => void }) {
+  const { data } = useBudget();
+  const nw = useMemo(() => netWorth(data.accounts, data.debts), [data.accounts, data.debts]);
+  const latest = useMemo(() => scoreSummary(data.creditScores).latest, [data.creditScores]);
+  const hasAccounts = data.accounts.length > 0;
+
+  if (!hasAccounts && !latest) {
+    return (
+      <Card title="Net worth & credit score" className="home-nw" data-testid="home-networth">
+        <p className="muted small">
+          Track your net worth and credit score: your savings, Roth IRA, retirement (like SERS) and more, in one place.
+        </p>
+        <button type="button" className="btn btn--secondary btn--block home-nw__start" onClick={onOpen}>
+          Track your net worth
+        </button>
+      </Card>
+    );
+  }
+  return (
+    <Card
+      title="Net worth"
+      className="home-nw"
+      data-testid="home-networth"
+      action={{ label: 'See net worth', onClick: onOpen }}
+    >
+      {hasAccounts ? (
+        <>
+          <p
+            className={`home-nw__value ${nw.netWorth < 0 ? 'tone-over' : 'tone-left'}`}
+            data-testid="home-networth-total"
+            data-cents={nw.netWorth}
+          >
+            {signedMoney(nw.netWorth, 'never')}
+          </p>
+          <p className="muted small">What you have minus what you owe.</p>
+        </>
+      ) : (
+        <p className="muted small">Add your savings and other accounts to see your net worth.</p>
+      )}
+      {latest && (
+        <p className="home-nw__score" data-testid="home-credit-score">
+          <span>
+            Credit score <strong>{latest.score}</strong>
+          </span>
+          <BandBadge score={latest.score} small />
+        </p>
+      )}
+    </Card>
   );
 }
 

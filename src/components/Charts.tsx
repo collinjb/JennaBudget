@@ -48,20 +48,35 @@ interface LineChartProps {
   startLabel: string;
   endLabel: string;
   tone?: Tone;
+  /** Bottom of the y-axis (default 0) and its label (default "$0"), e.g. 600 for a credit score. */
+  min?: number;
+  formatBottom?: (min: number) => string;
+  /** Top of the y-axis (default: the highest value). */
+  max?: number;
 }
 
 const W = 320;
 const H = 140;
 
 /** Simple falling line (with a soft area underneath). Labels are HTML so they never stretch. */
-export function LineChart({ values, ariaLabel, formatTop, startLabel, endLabel, tone = 'debt' }: LineChartProps) {
+export function LineChart({
+  values,
+  ariaLabel,
+  formatTop,
+  startLabel,
+  endLabel,
+  tone = 'debt',
+  min = 0,
+  formatBottom = () => '$0',
+  max: maxProp,
+}: LineChartProps) {
   const pts = downsample(values, 120);
   // Scale and label by the true peak (downsampling can skip it).
-  const max = values.reduce((m, v) => Math.max(m, v), 1);
+  const max = Math.max(maxProp ?? values.reduce((m, v) => Math.max(m, v), 1), min + 1);
   const n = pts.length;
   const xy = pts.map((v, i) => {
     const x = n === 1 ? 0 : (i / (n - 1)) * W;
-    const y = 6 + (1 - v / max) * (H - 12);
+    const y = 6 + (1 - (Math.min(max, Math.max(min, v)) - min) / (max - min)) * (H - 12);
     return [x, y] as const;
   });
   const line = xy.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
@@ -85,7 +100,7 @@ export function LineChart({ values, ariaLabel, formatTop, startLabel, endLabel, 
         </div>
         <div className="linechart__y">
           <span>{formatTop(max)}</span>
-          <span>$0</span>
+          <span>{formatBottom(min)}</span>
         </div>
       </div>
     </figure>

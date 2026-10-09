@@ -566,6 +566,14 @@
   font-size: var(--fs-footnote);
 }
 
+.choice__emoji {
+  flex: 0 0 auto;
+  width: 1.6em;
+  font-size: 1.25rem;
+  line-height: 1;
+  text-align: center;
+}
+
 .choice__check {
   width: 24px;
   height: 24px;
@@ -1133,6 +1141,43 @@ button.row {
 .badge--new {
   background: var(--c-left-soft);
   color: var(--c-left-ink);
+}
+
+/* Credit score band ("Good"): the word carries the meaning, the color backs it up. */
+.band {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: var(--fs-subhead);
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.band--sm {
+  padding: 2px 8px;
+  font-size: var(--fs-caption);
+}
+
+.band--savings {
+  background: var(--c-savings-soft);
+  color: var(--c-savings-ink);
+}
+
+.band--left {
+  background: var(--c-left-soft);
+  color: var(--c-left-ink);
+}
+
+.band--warn {
+  background: var(--c-warn-soft);
+  color: var(--c-warn-ink);
+}
+
+.band--over {
+  background: var(--c-over-soft);
+  color: var(--c-over-ink);
 }
 
 /* ---------- Notices (warning / info lines) ---------- */
@@ -1794,6 +1839,14 @@ body:has(.tabbar) .toast-region {
 
 .linechart__svg.tone-debt .linechart__area {
   fill: color-mix(in srgb, var(--c-debt) 16%, transparent);
+}
+
+.linechart__svg.tone-left .linechart__line {
+  stroke: var(--c-left);
+}
+
+.linechart__svg.tone-left .linechart__area {
+  fill: color-mix(in srgb, var(--c-left) 16%, transparent);
 }
 
 .linechart__base,

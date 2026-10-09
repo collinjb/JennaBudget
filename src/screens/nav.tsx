@@ -3,7 +3,7 @@ import type { TabKey } from '../components/TabBar';
 
 export type { TabKey };
 /** Full-screen pages pushed over the tabs. */
-export type PageKey = 'settings' | 'paycheck' | 'smartplan';
+export type PageKey = 'settings' | 'paycheck' | 'smartplan' | 'networth';
 /** Something a screen should do right away when opened (e.g. open its "add" sheet). */
 export type Intent = 'add' | 'add-goal' | 'add-spending';
 

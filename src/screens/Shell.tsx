@@ -9,6 +9,7 @@ import { DebtScreen } from './DebtScreen';
 import { HomeScreen } from './HomeScreen';
 import { MoneyInScreen } from './MoneyInScreen';
 import { NavContext, type Intent, type Nav, type PageKey, type TabKey } from './nav';
+import { NetWorthPage } from './NetWorthPage';
 import { PaycheckPlanPage } from './PaycheckPlanPage';
 import { SavingsScreen } from './SavingsScreen';
 import { SettingsPage } from './SettingsPage';
@@ -46,13 +47,13 @@ function findOpener(main: HTMLElement, o: Opener): HTMLElement | null {
 function pageFromState(state: unknown): PageKey | null {
   if (state && typeof state === 'object' && PAGE_STATE_KEY in state) {
     const p = (state as Record<string, unknown>)[PAGE_STATE_KEY];
-    if (p === 'settings' || p === 'paycheck' || p === 'smartplan') return p;
+    if (p === 'settings' || p === 'paycheck' || p === 'smartplan' || p === 'networth') return p;
   }
   return null;
 }
 
 /**
- * The main app: 5 tabs + full-screen pages (Settings, Paycheck Plan, Smart Plan) pushed on top.
+ * The main app: 5 tabs + full-screen pages (Settings, Paycheck Plan, Smart Plan, Net worth) pushed on top.
  * Pages use history.pushState so iOS swipe-back / Android back close them; the in-app Back button
  * always works too. Each tab remembers its scroll position.
  */
@@ -145,6 +146,7 @@ export function Shell() {
   if (page === 'settings') view = <SettingsPage />;
   else if (page === 'paycheck') view = <PaycheckPlanPage />;
   else if (page === 'smartplan') view = <SmartPlanPage />;
+  else if (page === 'networth') view = <NetWorthPage />;
   else if (tab === 'income') view = <MoneyInScreen />;
   else if (tab === 'bills') view = <BillsScreen />;
   else if (tab === 'savings') view = <SavingsScreen />;
