@@ -49,7 +49,11 @@ export function projectGoal(goal: Goal, today: ISODate): GoalProjection {
   const percent = target <= 0 ? 100 : Math.min(100, Math.max(0, Math.floor((saved * 100) / target)));
   const monthsLeft = goal.targetDate ? monthsBetween(currentMonth, monthKey(goal.targetDate)) : null;
   const pastDue = goal.targetDate !== null && compareISO(goal.targetDate, today) < 0;
-  const savedThisMonth = goal.monthDeposit && goal.monthDeposit.month === currentMonth ? goal.monthDeposit.amount : 0;
+  // Never more than the goal holds (e.g. "saved so far" was lowered by hand after adding money this month).
+  const savedThisMonth = Math.min(
+    goal.monthDeposit && goal.monthDeposit.month === currentMonth ? goal.monthDeposit.amount : 0,
+    saved,
+  );
   const auto = !reached && goal.targetDate !== null && !pastDue;
 
   let thisMonth: Cents;

@@ -12,7 +12,7 @@ import {
   monthKey,
   monthStart,
 } from './dates';
-import { minimumDue } from './debt';
+import { debtPaidThisMonth, minimumDue } from './debt';
 import { DEBT_TYPE_INFO } from './presets';
 import { compareText } from './text';
 
@@ -220,9 +220,13 @@ export function itemsDueBetween(data: BudgetData, start: ISODate, end: ISODate):
     }
   }
   for (const debt of data.debts) {
-    const amount = minimumDue(debt.minPayment, debt.balance);
-    if (!(amount > 0)) continue;
-    for (const date of debtDueDates(debt, start, end)) {
+    // A debt paid down (or off) this month still shows this month's payment, marked paid once it's covered.
+    const listed = { ...debt, balance: Math.max(debt.balance, debt.monthPaid?.amount ?? 0) };
+    for (const date of debtDueDates(listed, start, end)) {
+      const month = monthKey(date);
+      const paidThatMonth = Math.max(0, debtPaidThisMonth(debt, month));
+      const amount = minimumDue(debt.minPayment, debt.balance + paidThatMonth);
+      if (!(amount > 0)) continue;
       items.push({
         kind: 'debt',
         id: debt.id,
@@ -230,7 +234,7 @@ export function itemsDueBetween(data: BudgetData, start: ISODate, end: ISODate):
         emoji: DEBT_TYPE_INFO[debt.type]?.emoji ?? '📄',
         amount,
         date,
-        paid: false,
+        paid: paidThatMonth >= amount,
       });
     }
   }

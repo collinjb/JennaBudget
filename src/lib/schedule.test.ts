@@ -5,6 +5,7 @@ import {
   debtDueDates,
   extraPaycheckMonths,
   incomePaydays,
+  itemsDueBetween,
   nextPaydays,
   paycheckPlan,
   semimonthlyDaysError,
@@ -363,5 +364,24 @@ describe('semimonthlyDaysError', () => {
     for (const pair of [[1, 5], [29, 31], [30, 31], [28, 1], [31, 1], [27, 2]] as const) {
       expect(semimonthlyDaysError(pair)).toBe('Please pick days at least a week apart.');
     }
+  });
+});
+
+describe('Paycheck Plan and logged debt payments', () => {
+  const nov = '2026-11-01';
+  it('a debt already paid this month shows as paid; one paid off this month is still listed', () => {
+    const data = budget({
+      incomes: [income({ frequency: 'monthly', payDate: '2026-10-01', amount: 300_000 })],
+      debts: [
+        debt({ id: 'a', name: 'Card', balance: 100_000, minPayment: 5_000, dueDay: 20, monthPaid: { month: '2026-10', amount: 5_000 } }),
+        debt({ id: 'b', name: 'Store', balance: 0, minPayment: 2_500, dueDay: 25, monthPaid: { month: '2026-10', amount: 2_000 } }),
+      ],
+    });
+    const items = itemsDueBetween(data, '2026-10-01', nov);
+    expect(items.find((i) => i.id === 'a')).toMatchObject({ amount: 5_000, paid: true });
+    expect(items.find((i) => i.id === 'b')).toMatchObject({ amount: 2_000, paid: true });
+    // Next month: the paid-off debt is gone and the other is due again.
+    const next = itemsDueBetween(data, nov, '2026-12-01');
+    expect(next.map((i) => [i.id, i.paid])).toEqual([['a', false]]);
   });
 });

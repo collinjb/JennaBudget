@@ -170,3 +170,10 @@ describe('projectGoal: goals without a date', () => {
     expect(projectGoal(goal({ target: 100, saved: 0 }), today).percent).toBe(0);
   });
 });
+
+describe('projectGoal: this month never shows more than the goal holds', () => {
+  it('caps the month’s deposit at the saved amount (saved was lowered by hand)', () => {
+    const p = projectGoal(goal({ target: 100_000, saved: 3_000, monthly: 10_000, monthDeposit: { month: '2026-10', amount: 8_000 } }), today);
+    expect(p.savedThisMonth).toBe(3_000);
+  });
+});
