@@ -16,6 +16,9 @@ import {
   type Settings,
   type SpendingCategory,
   type ThemeSetting,
+  type Account,
+  type AccountType,
+  type CreditScore,
 } from '../types';
 
 // Persistence contract. Implemented by the iPhone & PWA agent.
@@ -229,7 +232,7 @@ function isObj(v: unknown): v is Obj {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-const COLLECTIONS = ['incomes', 'bills', 'debts', 'spending', 'goals'] as const;
+const COLLECTIONS = ['incomes', 'bills', 'debts', 'spending', 'goals', 'accounts', 'creditScores'] as const;
 type Collection = (typeof COLLECTIONS)[number];
 
 /** Defaults for item fields that older or partial data may not have. Required fields have no default. */
@@ -239,6 +242,8 @@ const ITEM_DEFAULTS: Record<Collection, Obj> = {
   debts: { type: 'other', monthPaid: null },
   spending: { emoji: '💵', kind: 'need' },
   goals: { emoji: '🎯', saved: 0, monthly: 0, targetDate: null, isEmergencyFund: false, monthDeposit: null },
+  accounts: { type: 'other' },
+  creditScores: {},
 };
 
 function migrateInternal(raw: unknown): { value: unknown; changed: boolean } {
@@ -313,6 +318,7 @@ const DEBT_TYPES: readonly DebtType[] = ['student', 'credit', 'car', 'personal',
 const SPENDING_KINDS: readonly SpendingCategory['kind'][] = ['need', 'fun'];
 const PAYOFF_METHODS: readonly PayoffMethod[] = ['avalanche', 'snowball'];
 const THEMES: readonly ThemeSetting[] = ['system', 'light', 'dark'];
+const ACCOUNT_TYPES: readonly AccountType[] = ['savings', 'checking', 'roth', 'retirement', 'investment', 'other'];
 
 const MIN_YEAR = 1900;
 const MAX_YEAR = 2999;
@@ -420,6 +426,14 @@ class Reader {
     return { month: month as string, amount: amount as number };
   }
 
+  creditScore(key: string): number {
+    const v = this.has(key);
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 300 || v > 850) {
+      this.fail('the credit score must be a whole number from 300 to 850.');
+    }
+    return v;
+  }
+
   monthOrNull(key: string): string | null {
     const v = this.has(key);
     if (v === null) return null;
@@ -480,6 +494,9 @@ const FIELD_LABELS: Record<string, string> = {
   isEmergencyFund: 'safety net',
   monthDeposit: 'money added this month',
   monthPaid: 'payments made this month',
+  updatedAt: 'last-updated date',
+  score: 'credit score',
+  date: 'date',
   payoffMethod: 'payoff method',
   extraDebtPayment: 'extra debt payment',
   theme: 'theme',
@@ -504,6 +521,8 @@ const LIST_LABELS: Record<Collection, { one: string; many: string }> = {
   debts: { one: 'Debt', many: 'debts' },
   spending: { one: 'Spending category', many: 'spending categories' },
   goals: { one: 'Savings goal', many: 'savings goals' },
+  accounts: { one: 'Account', many: 'accounts' },
+  creditScores: { one: 'Credit score', many: 'credit scores' },
 };
 
 function readList<T>(root: Obj, c: Collection, readItem: (r: Reader) => T): T[] {
@@ -584,6 +603,20 @@ function readGoal(r: Reader): Goal {
   };
 }
 
+function readAccount(r: Reader): Account {
+  return {
+    id: r.id(),
+    name: r.name(),
+    type: r.oneOf('type', ACCOUNT_TYPES),
+    balance: r.money('balance'),
+    updatedAt: r.date('updatedAt'),
+  };
+}
+
+function readCreditScore(r: Reader): CreditScore {
+  return { id: r.id(), score: r.creditScore('score'), date: r.date('date') };
+}
+
 function readSettings(root: Obj): Settings {
   const s = root.settings;
   if (!isObj(s)) throw new InvalidData('The settings are missing or damaged.');
@@ -632,6 +665,8 @@ export function validateBudget(raw: unknown): { ok: true; data: BudgetData } | {
       debts: readList(raw, 'debts', readDebt),
       spending: readList(raw, 'spending', readSpending),
       goals,
+      accounts: readList(raw, 'accounts', readAccount),
+      creditScores: readList(raw, 'creditScores', readCreditScore),
       settings: readSettings(raw),
     };
     return { ok: true, data };
@@ -650,6 +685,8 @@ export interface BackupSummary {
   debts: number;
   spending: number;
   goals: number;
+  accounts: number;
+  creditScores: number;
   /** ISO timestamp from the file, or null if absent. */
   exportedAt: string | null;
 }
@@ -727,6 +764,8 @@ export function parseBackup(
       debts: d.debts.length,
       spending: d.spending.length,
       goals: d.goals.length,
+      accounts: d.accounts.length,
+      creditScores: d.creditScores.length,
       exportedAt,
     },
   };

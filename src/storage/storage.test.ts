@@ -163,6 +163,8 @@ function sample(): BudgetData {
         monthDeposit: null,
       },
     ],
+    accounts: [],
+    creditScores: [],
     settings: {
       payoffMethod: 'snowball',
       extraDebtPayment: 5_000,
@@ -865,5 +867,48 @@ describe('markOnboardedIfFilled', () => {
     expect(markOnboardedIfFilled(empty)).toBe(empty);
     const done = sample();
     expect(markOnboardedIfFilled(done)).toBe(done);
+  });
+});
+
+describe('accounts and credit scores', () => {
+  it('older saved data without them loads with empty lists', () => {
+    const old = loose();
+    delete old.accounts;
+    delete old.creditScores;
+    const res = validateBudget(migrate(old));
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.data.accounts).toEqual([]);
+      expect(res.data.creditScores).toEqual([]);
+    }
+  });
+
+  it('valid accounts and scores round-trip; bad ones are rejected in plain English', () => {
+    const d = loose();
+    d.accounts = [{ id: 'a1', name: 'Roth IRA', type: 'roth', balance: 640_000, updatedAt: '2026-09-28' }];
+    d.creditScores = [{ id: 's1', score: 712, date: '2026-10-01' }];
+    const ok = validateBudget(d);
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.data.accounts[0]).toEqual(d.accounts[0]);
+
+    const badScore = loose();
+    badScore.creditScores = [{ id: 's1', score: 900, date: '2026-10-01' }];
+    expect(expectInvalid(badScore)).toMatch(/credit score must be a whole number from 300 to 850/);
+
+    const badType = loose();
+    badType.accounts = [{ id: 'a1', name: 'X', type: 'crypto', balance: 1, updatedAt: '2026-09-28' }];
+    expectInvalid(badType);
+
+    const negative = loose();
+    negative.accounts = [{ id: 'a1', name: 'X', type: 'savings', balance: -5, updatedAt: '2026-09-28' }];
+    expectInvalid(negative);
+  });
+
+  it('backups count them in the restore preview', () => {
+    const d = { ...sample(), accounts: [{ id: 'a1', name: 'Savings', type: 'savings' as const, balance: 1, updatedAt: '2026-10-01' }], creditScores: [] };
+    const { json } = makeBackup(d, '2026-10-08');
+    const res = parseBackup(json);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.summary).toMatchObject({ accounts: 1, creditScores: 0 });
   });
 });

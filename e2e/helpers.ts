@@ -155,6 +155,8 @@ export function budget(
     debts: parts.debts ?? [],
     spending: parts.spending ?? [],
     goals: parts.goals ?? [],
+    accounts: parts.accounts ?? [],
+    creditScores: parts.creditScores ?? [],
     settings: {
       payoffMethod: 'avalanche',
       extraDebtPayment: 0,

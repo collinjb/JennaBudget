@@ -38,6 +38,8 @@ function countsOf(d: BudgetData): Omit<BackupSummary, 'exportedAt'> {
     debts: d.debts.length,
     spending: d.spending.length,
     goals: d.goals.length,
+    accounts: d.accounts.length,
+    creditScores: d.creditScores.length,
   };
 }
 

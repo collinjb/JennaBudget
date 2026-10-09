@@ -1,4 +1,4 @@
-import type { Bill, BudgetData, Debt, Goal, ISODate, Income, SpendingCategory } from '../types';
+import type { Account, Bill, BudgetData, CreditScore, Debt, Goal, ISODate, Income, SpendingCategory } from '../types';
 import { DEFAULT_SETTINGS, SCHEMA_VERSION } from '../types';
 import { addDays, addMonthsToKey, dateInMonth, dayOfWeek, isoParts, monthKey } from './dates';
 import { newId } from './ids';
@@ -110,6 +110,20 @@ export function makeExampleBudget(today: ISODate): BudgetData {
     },
   ];
 
+  const accounts: Account[] = [
+    { id: newId(), name: 'Checking', type: 'checking', balance: 90_000, updatedAt: today },
+    { id: newId(), name: 'Savings', type: 'savings', balance: 215_000, updatedAt: today },
+    { id: newId(), name: 'Roth IRA', type: 'roth', balance: 640_000, updatedAt: inMonth(-1, 28) },
+    { id: newId(), name: 'SERS', type: 'retirement', balance: 1_180_000, updatedAt: inMonth(-1, 28) },
+  ];
+
+  // A rising score over the last few months, to show the history and the change.
+  const creditScores: CreditScore[] = [
+    { id: newId(), score: 690, date: inMonth(-4, 3) },
+    { id: newId(), score: 702, date: inMonth(-2, 3) },
+    { id: newId(), score: 712, date: inMonth(0, 1) },
+  ];
+
   return {
     schemaVersion: SCHEMA_VERSION,
     incomes,
@@ -117,6 +131,8 @@ export function makeExampleBudget(today: ISODate): BudgetData {
     debts,
     spending,
     goals,
+    accounts,
+    creditScores,
     settings: { ...DEFAULT_SETTINGS, payoffMethod: 'avalanche', extraDebtPayment: 2_500, onboarded: true, isExample: true },
   };
 }

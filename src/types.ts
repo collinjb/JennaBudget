@@ -144,11 +144,15 @@ export interface BudgetData {
   debts: Debt[];
   spending: SpendingCategory[];
   goals: Goal[];
+  /** Money you have (savings, checking, Roth IRA, retirement…), for net worth. */
+  accounts: Account[];
+  /** Credit score checks, any order (sorted by date when shown). */
+  creditScores: CreditScore[];
   settings: Settings;
 }
 
 /** The list-shaped collections in BudgetData. */
-export type CollectionName = 'incomes' | 'bills' | 'debts' | 'spending' | 'goals';
+export type CollectionName = 'incomes' | 'bills' | 'debts' | 'spending' | 'goals' | 'accounts' | 'creditScores';
 export type CollectionItem<K extends CollectionName> = BudgetData[K][number];
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -168,6 +172,8 @@ export function emptyBudget(): BudgetData {
     debts: [],
     spending: [],
     goals: [],
+    accounts: [],
+    creditScores: [],
     settings: { ...DEFAULT_SETTINGS },
   };
 }
