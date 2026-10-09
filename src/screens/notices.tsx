@@ -1,6 +1,7 @@
 import { IconWarning } from '../components/Icons';
 import { Money } from '../components/Money';
 import type { InterestWarning } from '../lib/debt';
+import { ceilDollars } from '../lib/money';
 import type { Cents } from '../types';
 
 /**
@@ -43,6 +44,25 @@ export function ShortByNotice({ shortBy, className }: { shortBy: Cents; classNam
         </strong>
         . Set aside <Money cents={shortBy} /> from the paycheck before.
       </span>
+    </p>
+  );
+}
+
+/** Heading for "the savings goals with dates don't fit" (Home plan card and Smart Plan). */
+export const GOALS_SHORT_TITLE = 'Your savings goals need more than you have';
+
+/**
+ * "Your savings goals with dates need $X more each month than you have after bills. Pushing a date back or lowering a
+ * goal would help." (rounded up, so a few cents never read "$0 more").
+ */
+export function GoalsShortText({ shortfall, className }: { shortfall: Cents; className?: string }) {
+  return (
+    <p className={className} data-testid="goals-shortfall">
+      Your savings goals with dates need{' '}
+      <strong>
+        <Money cents={ceilDollars(shortfall)} showCents="never" /> more
+      </strong>{' '}
+      each month than you have after bills. Pushing a date back or lowering a goal would help.
     </p>
   );
 }

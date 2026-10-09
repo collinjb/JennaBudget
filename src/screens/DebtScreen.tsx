@@ -9,18 +9,29 @@ import { EmptyState } from '../components/EmptyState';
 import { cleanName, TextField } from '../components/Field';
 import { Money } from '../components/Money';
 import { MoneyInput, useMoneyField } from '../components/MoneyInput';
+import { IconCheck, IconPlus, IconWarning } from '../components/Icons';
 import { PageHeader } from '../components/PageHeader';
+import { ProgressBar } from '../components/ProgressBar';
 import { RateInput, useRateField } from '../components/RateInput';
 import { SegmentedControl, Select } from '../components/Select';
 import { useToast } from '../components/Toast';
 import { formatDuration, formatMonth, monthKey, ordinal } from '../lib/dates';
-import { comparePayoffs, interestWarnings, simulatePayoff, type ExtraComparison } from '../lib/debt';
+import {
+  comparePayoffs,
+  debtsThisMonth,
+  interestWarnings,
+  simulatePayoff,
+  type DebtMonth,
+  type DebtPayoffInfo,
+  type ExtraComparison,
+  type InterestWarning,
+} from '../lib/debt';
 import { newId } from '../lib/ids';
 import { formatMoney, formatRate, MAX_MONEY_CENTS } from '../lib/money';
 import { DEBT_PRESETS, DEBT_TYPE_INFO, METHOD_INFO } from '../lib/presets';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
-import type { Cents, Debt, DebtType } from '../types';
+import type { Cents, Debt, DebtType, MonthKey } from '../types';
 import { useNav } from './nav';
 import { InterestWarningNotice } from './notices';
 import { useDeleteWithUndo } from './shared';
@@ -52,7 +63,10 @@ function nextStop(cur: Cents, dir: 1 | -1, planned: Cents, max: Cents): Cents {
   return Math.max(n, 0);
 }
 
-type SheetState = { kind: 'edit'; debt: Debt | null } | { kind: 'balance'; debt: Debt };
+type SheetState =
+  | { kind: 'edit'; debt: Debt | null }
+  | { kind: 'balance'; debt: Debt }
+  | { kind: 'pay'; debt: Debt };
 
 export function DebtScreen() {
   const { data, actions } = useBudget();
@@ -102,6 +116,12 @@ export function DebtScreen() {
     setTouched(next);
   };
   const warnings = useMemo(() => interestWarnings(active), [active]);
+  // This month's payment goal per debt (stays put while payments are logged) and each debt's own payoff time.
+  const thisMonth = useMemo(
+    () => new Map(debtsThisMonth(debts, method, planned, month).map((r) => [r.id, r])),
+    [debts, method, planned, month],
+  );
+  const payoffs = useMemo(() => new Map((base?.perDebt ?? []).map((p) => [p.id, p])), [base]);
   const totalDebt = useMemo(() => debts.reduce((a, d) => a + d.balance, 0), [debts]);
   const sliderId = useId();
 
@@ -233,10 +253,28 @@ export function DebtScreen() {
                       <span>due the {ordinal(d.dueDay)}</span>
                     </p>
                   )}
+                  {!paidOff && (
+                    <PayoffLine
+                      debtId={d.id}
+                      payoff={payoffs.get(d.id)}
+                      warning={warnings.find((w) => w.debtId === d.id)}
+                    />
+                  )}
+                  {!paidOff && <DebtMonthBox debt={d} row={thisMonth.get(d.id)} />}
                   <div className="btn-row">
+                    {!paidOff && (
+                      <button
+                        type="button"
+                        className="btn btn--secondary btn--sm btn-row__wide"
+                        aria-label={`Log a payment on ${d.name}`}
+                        onClick={() => setSheet({ kind: 'pay', debt: d })}
+                      >
+                        <IconPlus size={16} /> Log a payment
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="btn btn--secondary btn--sm"
+                      className="btn btn--gray btn--sm"
                       aria-label={`Update balance for ${d.name}`}
                       onClick={() => setSheet({ kind: 'balance', debt: d })}
                     >
@@ -375,6 +413,17 @@ export function DebtScreen() {
           }}
         />
       )}
+      {sheet?.kind === 'pay' && (
+        <LogPaymentSheet
+          debt={sheet.debt}
+          row={thisMonth.get(sheet.debt.id)}
+          month={month}
+          onClose={(paidOff) => {
+            setSheet(null);
+            if (paidOff) setCelebrate(sheet.debt.name);
+          }}
+        />
+      )}
       {celebrate && (
         <Celebration
           title="Paid off!"
@@ -385,6 +434,98 @@ export function DebtScreen() {
           }
           onDone={() => setCelebrate(null)}
         />
+      )}
+    </div>
+  );
+}
+
+/** "Paid off in about 2 yrs 4 mo (Feb 2029)", or why it won't be at this pace (worded like the interest warnings). */
+function PayoffLine({
+  debtId,
+  payoff,
+  warning,
+}: {
+  debtId: string;
+  payoff: DebtPayoffInfo | undefined;
+  warning: InterestWarning | undefined;
+}) {
+  const testId = `debt-payoff-${debtId}`;
+  if (payoff && payoff.months !== null && payoff.payoffMonth) {
+    return (
+      <p className="debt-card__payoff" data-testid={testId}>
+        <span>
+          Paid off in about <strong>{formatDuration(payoff.months)}</strong> (
+          {formatMonth(payoff.payoffMonth, 'short')})
+        </span>
+      </p>
+    );
+  }
+  return (
+    <p className="debt-card__payoff debt-card__payoff--never" data-testid={testId}>
+      <IconWarning size={16} />
+      <span>
+        {warning?.kind === 'no-payment'
+          ? "There's no monthly payment set, so this balance never gets paid down."
+          : warning?.kind === 'flat'
+            ? "Won't be paid off at this pace: this balance won't go down."
+            : warning?.kind === 'grows'
+              ? "Won't be paid off at this pace: this balance will keep growing."
+              : "Won't be paid off within 50 years at this pace."}
+      </span>
+    </p>
+  );
+}
+
+/**
+ * This month's payment goal and how much of it is logged: "This month's payment: $250 · $120 paid · $130 to go",
+ * or "✓ Paid for this month".
+ */
+function DebtMonthBox({ debt, row }: { debt: Debt; row: DebtMonth | undefined }) {
+  if (!row) return null;
+  const testId = `debt-this-month-${debt.id}`;
+  if (row.goal <= 0) {
+    // Nothing planned for it this month (no minimum, and extra goes to another debt first).
+    if (row.paid <= 0) return null;
+    return (
+      <p className="debt-month debt-month--done" data-testid={testId}>
+        <IconCheck size={16} />
+        <span>
+          <Money cents={row.paid} /> paid this month
+        </span>
+      </p>
+    );
+  }
+  const done = row.toGo === 0;
+  return (
+    <div className={`debt-month${done ? ' debt-month--done' : ''}`} data-testid={testId}>
+      <p className="debt-month__head">
+        <span>This month's payment:</span>{' '}
+        <strong>
+          <Money cents={row.goal} />
+        </strong>
+      </p>
+      <ProgressBar
+        percent={(Math.min(row.paid, row.goal) * 100) / row.goal}
+        tone={done ? 'savings' : 'debt'}
+        size="sm"
+        label={`${debt.name} this month`}
+        valueText={`${formatMoney(row.paid)} of ${formatMoney(row.goal)} paid this month`}
+      />
+      {done ? (
+        <p className="debt-month__status debt-month__status--done">
+          <IconCheck size={16} />
+          <span>Paid for this month</span>
+        </p>
+      ) : (
+        <p className="debt-month__status">
+          <span>
+            <Money cents={row.paid} /> paid
+          </span>
+          <span aria-hidden="true"> · </span>
+          <span>
+            <Money cents={row.toGo} /> to go
+          </span>
+        </p>
       )}
     </div>
   );
@@ -474,6 +615,7 @@ export function DebtSheet({ debt, onClose }: { debt: Debt | null; onClose: () =>
       rateBps: r,
       minPayment: m,
       dueDay,
+      monthPaid: debt?.monthPaid ?? null,
     });
     return true;
   };
@@ -542,7 +684,82 @@ function BalanceSheet({ debt, onClose }: { debt: Debt; onClose: (paidOff: boolea
       <p className="sheet__intro">
         Check your latest statement for <strong>{debt.name}</strong> and enter what you owe now.
       </p>
-      <MoneyInput label="Current balance" {...balance.props} big />
+      <MoneyInput
+        label="Current balance"
+        {...balance.props}
+        big
+        helper="Made a payment? Use “Log a payment” instead, so it counts toward this month."
+      />
+    </BottomSheet>
+  );
+}
+
+/** "Log a payment": lowers the balance and counts toward this month's payment (with Undo). */
+function LogPaymentSheet({
+  debt,
+  row,
+  month,
+  onClose,
+}: {
+  debt: Debt;
+  row: DebtMonth | undefined;
+  month: MonthKey;
+  onClose: (paidOff: boolean) => void;
+}) {
+  const { data, actions } = useBudget();
+  const toast = useToast();
+  // Start with what's left of this month's payment (never more than what's owed).
+  const suggested = row ? Math.min(row.toGo, debt.balance) : 0;
+  const amount = useMoneyField(suggested > 0 ? suggested : null, { required: true, allowZero: false });
+  const paidOff = useRef(false);
+
+  const save = () => {
+    const cents = amount.validate();
+    if (cents === null) return false;
+    const previous = data.debts.find((x) => x.id === debt.id) ?? debt;
+    paidOff.current = previous.balance > 0 && cents >= previous.balance;
+    actions.payDebt(debt.id, cents, month);
+    toast.show({
+      message: 'Payment logged',
+      actionLabel: 'Undo',
+      onAction: () => actions.upsert('debts', previous),
+      // Undo puts the whole debt back as it was; after any other change that could quietly undo that change too.
+      dismissOnChange: true,
+    });
+    return true;
+  };
+
+  return (
+    <BottomSheet
+      title="Log a payment"
+      onClose={() => onClose(paidOff.current)}
+      onSave={save}
+      bigSaveLabel="Log payment"
+      testId="log-payment-sheet"
+    >
+      <p className="sheet__intro">
+        <strong>{debt.name}</strong>: <Money cents={debt.balance} /> left to pay.
+        {row && row.goal > 0 && (
+          <>
+            {' '}
+            This month's payment is <Money cents={row.goal} />
+            {row.toGo > 0 ? (
+              <>
+                {' '}
+                (<Money cents={row.toGo} /> to go).
+              </>
+            ) : (
+              ', and it’s all paid.'
+            )}
+          </>
+        )}
+      </p>
+      <MoneyInput
+        label="How much did you pay?"
+        {...amount.props}
+        big
+        helper="This lowers your balance and counts toward this month's payment."
+      />
     </BottomSheet>
   );
 }

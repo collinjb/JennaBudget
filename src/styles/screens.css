@@ -80,6 +80,30 @@
   margin-top: 12px;
 }
 
+.home-debt-month {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: var(--fs-subhead);
+  line-height: 1.4;
+}
+
+.home-debt-month svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.home-debt-month > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.home-debt-month strong {
+  font-weight: 800;
+  color: var(--c-debt-ink);
+}
+
 .home-warn .notice {
   margin: 0;
 }
@@ -380,6 +404,79 @@
   font-size: var(--fs-footnote);
 }
 
+/* This month's part of a goal: "This month: $120 of $300 saved" (+ a small bar), or "✓ This month's $300 is saved". */
+.goal-month {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.goal-month__text {
+  font-size: var(--fs-subhead);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.goal-month__text strong {
+  font-weight: 800;
+  color: var(--c-savings-ink);
+}
+
+.goal-month--done {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+  background: var(--c-savings-soft);
+  color: var(--c-savings-ink);
+  font-size: var(--fs-subhead);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.goal-month--done svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.goal-month--done > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The small bar sits on a gray box: a slightly stronger track keeps it visible. */
+.goal-month .progress,
+.debt-month .progress {
+  background: var(--fill-strong);
+}
+
+/* Home: just the line, no box. */
+.goal-month--compact {
+  padding: 0;
+  background: none;
+}
+
+.goal-month--compact,
+.goal-month--compact .goal-month__text {
+  font-size: var(--fs-footnote);
+}
+
+/* Goal sheet: the automatic monthly amount for a goal with a date. */
+.auto-note strong {
+  color: var(--c-savings-ink);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.auto-note__more {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: var(--fs-footnote);
+}
+
 .field-row--top {
   align-items: flex-start;
 }
@@ -490,6 +587,90 @@
   font-size: var(--fs-subhead);
   color: var(--text-2);
   line-height: 1.4;
+}
+
+/* "Paid off in about 2 yrs 4 mo (Feb 2029)" */
+.debt-card__payoff {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--fs-subhead);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.debt-card__payoff strong {
+  font-weight: 700;
+  color: var(--c-debt-ink);
+}
+
+.debt-card__payoff--never {
+  color: var(--c-warn-ink);
+  font-weight: 600;
+}
+
+.debt-card__payoff svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.debt-card__payoff > span {
+  min-width: 0;
+}
+
+/* This month's payment: goal, a small bar, and what's paid / to go. */
+.debt-month {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.debt-month__head {
+  font-size: var(--fs-subhead);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.debt-month__head strong {
+  font-size: var(--fs-callout);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.debt-month__status {
+  font-size: var(--fs-subhead);
+  color: var(--text-2);
+  line-height: 1.35;
+}
+
+.debt-month__status--done,
+p.debt-month--done {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--c-savings-ink);
+  font-weight: 600;
+}
+
+p.debt-month--done {
+  flex-direction: row;
+  font-size: var(--fs-subhead);
+  line-height: 1.35;
+  background: var(--c-savings-soft);
+}
+
+.debt-month__status--done svg,
+p.debt-month--done svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+/* The main button of a row gets the whole first line; the others share the next. */
+.btn-row > .btn-row__wide {
+  flex-basis: 100%;
 }
 
 .extra-card__q {
@@ -777,6 +958,16 @@
   margin-top: 2px;
 }
 
+.plan-dated__amounts {
+  font-size: var(--fs-callout);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.plan-dated__amounts strong {
+  font-weight: 800;
+}
+
 .plan-line__from {
   color: var(--text-2);
 }
@@ -853,6 +1044,13 @@
 
 .plan-cta {
   margin-top: 14px;
+}
+
+.section-sub {
+  margin: 2px 4px 0;
+  color: var(--text-2);
+  font-size: var(--fs-subhead);
+  line-height: 1.4;
 }
 
 /* ---------- Settings ---------- */

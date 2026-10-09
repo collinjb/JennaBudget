@@ -12,6 +12,7 @@ import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import type { Goal } from '../types';
 import { useNav } from './nav';
+import { GOALS_SHORT_TITLE, GoalsShortText } from './notices';
 import { plural } from './shared';
 
 export function SmartPlanPage() {
@@ -62,7 +63,27 @@ export function SmartPlanPage() {
         <Infeasible plan={plan} onIncome={() => nav.goTab('income')} onBills={() => nav.goTab('bills')} />
       ) : (
         <>
-          {plan.hasSuggestions ? (
+          {plan.goalsShortfall > 0 ? (
+            <>
+              <Card tone="over" className="plan-intro" data-testid="plan-goals-short">
+                <div className="plan-card__head">
+                  <span className="plan-card__icon plan-card__icon--warn" aria-hidden="true">
+                    <IconWarning size={22} />
+                  </span>
+                  <h2 className="card__title">{GOALS_SHORT_TITLE}</h2>
+                </div>
+                <GoalsShortText shortfall={plan.goalsShortfall} className="small" />
+                <button
+                  type="button"
+                  className="btn btn--primary btn--block plan-cta"
+                  onClick={() => nav.goTab('savings')}
+                >
+                  Go to Savings &amp; Fun
+                </button>
+              </Card>
+              <DatedGoals plan={plan} />
+            </>
+          ) : plan.hasSuggestions ? (
             <Card tone="info" className="plan-intro">
               <div className="plan-card__head">
                 <span className="plan-card__icon" aria-hidden="true">
@@ -149,11 +170,51 @@ export function SmartPlanPage() {
               )}
             </>
           )}
+
+          {plan.goalsShortfall === 0 && <DatedGoals plan={plan} />}
         </>
       )}
 
       <p className="footnote">These are general budgeting guidelines, not professional financial advice.</p>
     </div>
+  );
+}
+
+/** Goals with a target date: their amounts are worked out automatically and come out first, so the plan lists them
+ * (not adjustable here). */
+function DatedGoals({ plan }: { plan: SmartPlan }) {
+  if (plan.datedGoals.length === 0) return null;
+  return (
+    <section aria-labelledby="dated-title" className="stack stack--sm" data-testid="plan-dated-goals">
+      <div>
+        <h2 className="section-title" id="dated-title">
+          Set automatically (goals with a date)
+        </h2>
+        <p className="section-sub">These come out first so you hit your dates.</p>
+      </div>
+      <ul className="list plan-lines" role="list">
+        {plan.datedGoals.map((g) => (
+          <li key={g.id} className="plan-line">
+            <div className="plan-line__top">
+              <span className="row__icon" aria-hidden="true">
+                {g.emoji}
+              </span>
+              <div className="plan-line__main">
+                <p className="plan-line__name">
+                  <span className="ellipsis">{g.name}</span>
+                </p>
+                <p className="plan-dated__amounts">
+                  <strong>
+                    <Money cents={g.thisMonth} />
+                  </strong>{' '}
+                  <span className="muted">this month · by {formatMonth(monthKey(g.targetDate))}</span>
+                </p>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

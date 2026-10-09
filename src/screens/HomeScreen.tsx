@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import { Card } from '../components/Card';
 import { StackedBar, type Tone } from '../components/Charts';
 import { useConfirm } from '../components/ConfirmDialog';
-import { IconArrowRight, IconChevronRight, IconGear, IconInfo, IconSparkle, IconWarning } from '../components/Icons';
+import { IconArrowRight, IconCheck, IconChevronRight, IconGear, IconInfo, IconSparkle, IconWarning } from '../components/Icons';
 import { Money } from '../components/Money';
 import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
 import { formatDate, formatDuration, formatMonth, monthKey } from '../lib/dates';
-import { interestWarnings } from '../lib/debt';
+import { debtsThisMonth, interestWarnings } from '../lib/debt';
 import { projectGoal } from '../lib/goals';
 import { ceilDollars, formatMoney } from '../lib/money';
 import { paycheckPlan, type PaycheckWindow } from '../lib/schedule';
@@ -16,9 +16,9 @@ import { homeBreakdown, monthlySummary, type BreakdownKey } from '../lib/summary
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import { DEFAULT_SETTINGS, emptyBudget } from '../types';
-import { GoalStatusLine } from './goalStatus';
+import { GoalMonthLine, GoalStatusLine } from './goalStatus';
 import { useNav } from './nav';
-import { InterestWarningNotice, ShortByNotice } from './notices';
+import { GOALS_SHORT_TITLE, GoalsShortText, InterestWarningNotice, ShortByNotice } from './notices';
 
 const PARTS: { key: BreakdownKey; label: string; tone: Tone }[] = [
   { key: 'bills', label: 'Bills', tone: 'bills' },
@@ -35,7 +35,7 @@ export function HomeScreen() {
   const confirm = useConfirm();
   const month = monthKey(today);
 
-  const summary = useMemo(() => monthlySummary(data), [data]);
+  const summary = useMemo(() => monthlySummary(data, today), [data, today]);
   const hb = useMemo(() => homeBreakdown(summary), [summary]);
   const windows = useMemo(() => paycheckPlan(data, today, 1), [data, today]);
   const plan = useMemo(() => buildSmartPlan(data, today), [data, today]);
@@ -44,6 +44,11 @@ export function HomeScreen() {
   const payoff =
     activeDebts.length > 0 ? { months: plan.impact.monthsBefore, debtFreeMonth: plan.impact.debtFreeBefore } : null;
   const warnings = useMemo(() => interestWarnings(activeDebts), [activeDebts]);
+  // This month's debt payments, all debts together (the goal stays put while payments are logged).
+  const debtMonth = useMemo(() => {
+    const rows = debtsThisMonth(data.debts, data.settings.payoffMethod, data.settings.extraDebtPayment, month);
+    return { goal: rows.reduce((a, r) => a + r.goal, 0), paid: rows.reduce((a, r) => a + Math.min(r.paid, r.goal), 0) };
+  }, [data.debts, data.settings.payoffMethod, data.settings.extraDebtPayment, month]);
   const goalRows = useMemo(() => data.goals.map((g) => ({ g, proj: projectGoal(g, today) })), [data.goals, today]);
 
   const hasIncome = data.incomes.length > 0;
@@ -224,6 +229,26 @@ export function HomeScreen() {
               <span className="muted">(not within 50 years).</span>
             </p>
           )}
+          {debtMonth.goal > 0 && (
+            <p className="home-debt-month" data-testid="home-debt-this-month">
+              {debtMonth.paid >= debtMonth.goal ? (
+                <>
+                  <IconCheck size={16} className="tone-savings" />
+                  <span>
+                    This month's debt payments are all paid (<Money cents={debtMonth.goal} />).
+                  </span>
+                </>
+              ) : (
+                <span>
+                  This month's debt payments:{' '}
+                  <strong>
+                    <Money cents={debtMonth.paid} />
+                  </strong>{' '}
+                  of <Money cents={debtMonth.goal} /> paid
+                </span>
+              )}
+            </p>
+          )}
           {warnings.length > 0 && (
             <div className="home-warn stack stack--sm">
               {warnings.map((w) => (
@@ -237,7 +262,7 @@ export function HomeScreen() {
       {/* 5. Smart Plan */}
       {hasIncome && (
         <Card
-          className={`plan-card${!plan.feasible ? ' plan-card--short' : plan.hasSuggestions ? ' plan-card--new' : ''}`}
+          className={`plan-card${!plan.feasible || plan.goalsShortfall > 0 ? ' plan-card--short' : plan.hasSuggestions ? ' plan-card--new' : ''}`}
           data-testid="plan-card"
         >
           {!plan.feasible ? (
@@ -258,6 +283,19 @@ export function HomeScreen() {
               </p>
               <button type="button" className="btn btn--primary btn--block" onClick={() => nav.openPage('smartplan')}>
                 See what could help
+              </button>
+            </>
+          ) : plan.goalsShortfall > 0 ? (
+            <>
+              <div className="plan-card__head">
+                <span className="plan-card__icon plan-card__icon--warn" aria-hidden="true">
+                  <IconWarning size={22} />
+                </span>
+                <h2 className="card__title">{GOALS_SHORT_TITLE}</h2>
+              </div>
+              <GoalsShortText shortfall={plan.goalsShortfall} className="muted small" />
+              <button type="button" className="btn btn--primary btn--block" onClick={() => nav.openPage('smartplan')}>
+                See the Smart Plan
               </button>
             </>
           ) : plan.hasSuggestions ? (
@@ -327,6 +365,7 @@ export function HomeScreen() {
                     valueText={`${formatMoney(g.saved)} of ${formatMoney(g.target)}`}
                   />
                   <GoalStatusLine goal={g} projection={proj} compact />
+                  <GoalMonthLine goal={g} projection={proj} compact />
                 </li>
               );
             })}

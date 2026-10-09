@@ -6,21 +6,21 @@ import { DateInput, isUsableDate } from '../components/DateInput';
 import { EmojiPicker } from '../components/EmojiPicker';
 import { EmptyState } from '../components/EmptyState';
 import { cleanName, TextField, Toggle } from '../components/Field';
-import { IconChevronRight, IconPlus } from '../components/Icons';
+import { IconCheck, IconChevronRight, IconPlus } from '../components/Icons';
 import { Money } from '../components/Money';
 import { MoneyInput, useMoneyField } from '../components/MoneyInput';
 import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
 import { SegmentedControl } from '../components/Select';
 import { addMonthsClamped, compareISO, formatMonth, monthKey } from '../lib/dates';
-import { projectGoal } from '../lib/goals';
+import { projectGoal, type GoalProjection } from '../lib/goals';
 import { newId } from '../lib/ids';
 import { formatMoney } from '../lib/money';
 import { GOAL_PRESETS, SPENDING_PRESETS } from '../lib/presets';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import type { Goal, ISODate, SpendingCategory } from '../types';
-import { GoalStatusLine } from './goalStatus';
+import { GoalMonthLine, GoalStatusLine } from './goalStatus';
 import { useNav } from './nav';
 import { useDeleteWithUndo } from './shared';
 
@@ -45,9 +45,11 @@ export function SavingsScreen() {
   const spending = data.spending;
   const goals = data.goals;
   const spendingTotal = useMemo(() => spending.reduce((a, s) => a + s.monthly, 0), [spending]);
+  const projections = useMemo(() => new Map(goals.map((g) => [g.id, projectGoal(g, today)])), [goals, today]);
+  // What the goals set aside this month (automatic amounts for goals with a date): the same number Home uses.
   const savingTotal = useMemo(
-    () => goals.filter((g) => g.saved < g.target).reduce((a, g) => a + g.monthly, 0),
-    [goals],
+    () => goals.reduce((a, g) => a + (projections.get(g.id)?.thisMonth ?? 0), 0),
+    [goals, projections],
   );
 
   return (
@@ -115,7 +117,7 @@ export function SavingsScreen() {
         <h2 className="section-title">Savings goals</h2>
         {goals.length > 0 && savingTotal > 0 && (
           <span className="section-head__aside">
-            Saving <Money cents={savingTotal} /> a month
+            Saving <Money cents={savingTotal} /> this month
           </span>
         )}
       </div>
@@ -132,7 +134,7 @@ export function SavingsScreen() {
         <>
           <ul className="stack stack--sm" role="list">
             {goals.map((g) => {
-              const proj = projectGoal(g, today);
+              const proj = projections.get(g.id) ?? projectGoal(g, today);
               const reached = proj.status === 'reached';
               return (
                 <li key={g.id} className={`card goal-card${reached ? ' goal-card--done' : ''}`}>
@@ -144,12 +146,16 @@ export function SavingsScreen() {
                       <h3 className="goal-card__name">{g.name}</h3>
                       <p className="goal-card__sub">
                         {g.isEmergencyFund && <span className="badge badge--savings">Safety net</span>}
-                        {!reached && g.monthly > 0 && (
-                          <span>
-                            <Money cents={g.monthly} /> a month
-                          </span>
+                        {proj.auto && g.targetDate ? (
+                          <span>Target date: {formatShortTarget(g.targetDate)}</span>
+                        ) : (
+                          !reached &&
+                          g.monthly > 0 && (
+                            <span>
+                              <Money cents={g.monthly} /> a month
+                            </span>
+                          )
                         )}
-                        {g.targetDate && !reached && <span>· by {formatShortTarget(g.targetDate)}</span>}
                       </p>
                     </div>
                   </div>
@@ -169,6 +175,7 @@ export function SavingsScreen() {
                     valueText={`${formatMoney(g.saved)} of ${formatMoney(g.target)}`}
                   />
                   <GoalStatusLine goal={g} projection={proj} />
+                  <GoalMonthLine goal={g} projection={proj} />
                   <div className="btn-row">
                     {!reached && (
                       <button
@@ -208,6 +215,7 @@ export function SavingsScreen() {
       {sheet?.kind === 'add-money' && (
         <AddMoneySheet
           goal={sheet.item}
+          today={today}
           onClose={(reached) => {
             setSheet(null);
             if (reached) setCelebrate(sheet.item.name);
@@ -318,10 +326,34 @@ export function GoalSheet({ item, today, onClose }: { item: Goal | null; today: 
   const [isEF, setIsEF] = useState(item?.isEmergencyFund ?? false);
   const otherEF = data.goals.find((g) => g.isEmergencyFund && g.id !== item?.id);
 
+  // With a target date the monthly amount is automatic: preview it live from what's typed so far.
+  const draftTarget = target.peek();
+  const draftSaved = saved.peek();
+  const datePreviewable = hasDate && isUsableDate(date) && compareISO(date, today) >= 0;
+  const preview =
+    datePreviewable && draftTarget !== null && draftTarget > 0 && draftSaved !== null
+      ? projectGoal(
+          {
+            id: item?.id ?? 'draft',
+            name,
+            emoji,
+            target: draftTarget,
+            saved: draftSaved,
+            monthly: 0,
+            targetDate: date,
+            isEmergencyFund: isEF,
+            monthDeposit: item?.monthDeposit ?? null,
+          },
+          today,
+        )
+      : null;
+
   const save = () => {
     const t = target.validate();
     const s = saved.validate();
-    const m = monthly.validate();
+    // With a date the monthly field is hidden (the amount is automatic); keep whatever it held so it comes back if
+    // the date is removed later.
+    const m = hasDate ? (monthly.peek() ?? item?.monthly ?? 0) : monthly.validate();
     let ok = t !== null && s !== null && m !== null;
     if (hasDate) {
       if (!isUsableDate(date)) {
@@ -343,6 +375,7 @@ export function GoalSheet({ item, today, onClose }: { item: Goal | null; today: 
       monthly: m,
       targetDate: hasDate ? date : null,
       isEmergencyFund: isEF,
+      monthDeposit: item?.monthDeposit ?? null,
     });
     return true;
   };
@@ -381,20 +414,28 @@ export function GoalSheet({ item, today, onClose }: { item: Goal | null; today: 
       <MoneyInput label="Goal amount" {...target.props} big helper="How much you want to save in total." />
       <div className="field-row field-row--top">
         <MoneyInput label="Saved so far" {...saved.props} />
-        <MoneyInput label="Add each month" {...monthly.props} />
+        {!hasDate && <MoneyInput label="Add each month" {...monthly.props} />}
       </div>
-      <Toggle label="Reach it by a certain date" checked={hasDate} onChange={setHasDate} />
+      <Toggle
+        label="Reach it by a certain date"
+        checked={hasDate}
+        onChange={setHasDate}
+        helper={hasDate ? undefined : 'Want it to catch up automatically if you miss a month? Add a target date.'}
+      />
       {hasDate && (
-        <DateInput
-          label="Target date"
-          value={date}
-          onChange={(v) => {
-            setDate(v);
-            setDateError(null);
-          }}
-          error={dateError}
-          helper="We'll tell you how much to save each month to make it."
-        />
+        <>
+          <DateInput
+            label="Target date"
+            value={date}
+            onChange={(v) => {
+              setDate(v);
+              setDateError(null);
+            }}
+            error={dateError}
+            helper={preview ? undefined : "Pick a date, and we'll work out how much to set aside each month."}
+          />
+          {preview && <AutoAmountNote preview={preview} />}
+        </>
       )}
       <Toggle
         label="This is my safety net (emergency fund)"
@@ -410,19 +451,75 @@ export function GoalSheet({ item, today, onClose }: { item: Goal | null; today: 
   );
 }
 
-function AddMoneySheet({ goal, onClose }: { goal: Goal; onClose: (reached: boolean) => void }) {
+/** Goal sheet, with a target date: the amount set aside automatically, worked out live from the fields. */
+function AutoAmountNote({ preview }: { preview: GoalProjection }) {
+  if (preview.status === 'reached') {
+    return (
+      <p className="notice notice--good" data-testid="goal-auto-amount">
+        <IconCheck size={18} />
+        <span>You've already saved enough for this goal.</span>
+      </p>
+    );
+  }
+  return (
+    <div className="notice notice--good auto-note" data-testid="goal-auto-amount">
+      <IconCheck size={18} />
+      <span>
+        {preview.monthsLeft === 0 ? (
+          <>
+            We'll set aside{' '}
+            <strong>
+              <Money cents={preview.thisMonth} />
+            </strong>{' '}
+            this month to make it.
+          </>
+        ) : (
+          <>
+            We'll set aside about{' '}
+            <strong>
+              <Money cents={preview.thisMonth} /> a month
+            </strong>
+            .
+          </>
+        )}
+        <span className="auto-note__more">
+          If a month comes up short, the next months go up a little so you still make it.
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function AddMoneySheet({ goal, today, onClose }: { goal: Goal; today: ISODate; onClose: (reached: boolean) => void }) {
   const { actions } = useBudget();
-  const amount = useMoneyField(null, { required: true, allowZero: false });
-  const reached = useRef(false);
   const left = Math.max(0, goal.target - goal.saved);
+  // Start with what this month still needs (never more than what's left to reach the goal).
+  const [proj] = useState(() => projectGoal(goal, today));
+  const suggested = Math.min(proj.thisMonthToGo, left);
+  const amount = useMoneyField(suggested > 0 ? suggested : null, { required: true, allowZero: false });
+  const reached = useRef(false);
 
   const save = () => {
     const cents = amount.validate();
     if (cents === null) return false;
     reached.current = goal.saved < goal.target && goal.saved + cents >= goal.target;
-    actions.addToGoal(goal.id, cents);
+    actions.addToGoal(goal.id, cents, monthKey(today));
     return true;
   };
+
+  let helper: string | undefined;
+  if (proj.thisMonth > 0 && proj.status !== 'reached') {
+    const month = formatMoney(proj.thisMonth);
+    if (suggested > 0) {
+      if (suggested < proj.thisMonthToGo) helper = "That's all it takes to reach this goal.";
+      else if (suggested === proj.thisMonth) helper = `That's this month's ${month}.`;
+      else helper = `That's what's left of this month's ${month}.`;
+    } else {
+      helper = proj.auto
+        ? `This month's ${month} is already saved. Anything extra makes the next months a little smaller.`
+        : `This month's ${month} is already saved. Anything extra gets you there sooner.`;
+    }
+  }
 
   return (
     <BottomSheet
@@ -442,7 +539,7 @@ function AddMoneySheet({ goal, onClose }: { goal: Goal; onClose: (reached: boole
           </>
         )}
       </p>
-      <MoneyInput label="How much did you put in?" {...amount.props} big />
+      <MoneyInput label="How much did you put in?" {...amount.props} big helper={helper} />
     </BottomSheet>
   );
 }

@@ -217,3 +217,108 @@ test.describe('Debt', () => {
     await expect(page.getByTestId('left-over')).toHaveText('$640');
   });
 });
+
+test.describe('Debt: this month\'s payment', () => {
+  test('"Log a payment" lowers the balance, shows progress, moves the payoff earlier, and Undo puts it back', async ({ page }) => {
+    const data = standardBudget();
+    const original = data.debts[0];
+    await openApp(page, data);
+    await expect(page.getByTestId('home-debt-this-month')).toHaveText("This month's debt payments: $0 of $100 paid");
+    await goTab(page, 'Debt');
+    const card = debtCard(page, 'Credit Card');
+    const month = page.getByTestId(`debt-this-month-${original.id}`);
+    const payoff = page.getByTestId(`debt-payoff-${original.id}`);
+    await expect(month).toContainText("This month's payment: $100");
+    await expect(month).toContainText('$0 paid · $100 to go');
+    // $3,000 at 24.99% with $100 a month: 48 payments, the last one in October 2030.
+    await expect(payoff).toHaveText('Paid off in about 4 yrs (Oct 2030)');
+
+    await page.getByRole('button', { name: 'Log a payment on Credit Card' }).click();
+    let s = sheet(page, 'log-payment-sheet');
+    const field = s.getByLabel('How much did you pay?');
+    // Starts with what's left of this month's payment.
+    await expect(field).toHaveValue('100');
+    await expect(field).toHaveAccessibleDescription("This lowers your balance and counts toward this month's payment.");
+    await field.fill('40');
+    await s.getByRole('button', { name: 'Log payment' }).click();
+    await expect(s).toBeHidden();
+    await expect(page.getByRole('status')).toContainText('Payment logged');
+    await expect(card).toContainText('$2,960');
+    await expectCents(page.getByTestId('debt-total'), 296_000);
+    await expect(month).toContainText("This month's payment: $100");
+    await expect(month).toContainText('$40 paid · $60 to go');
+    await expect(month.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40');
+    await expect(payoff).toHaveText('Paid off in about 3 yrs 11 mo (Sep 2030)');
+    expect((await stored(page)).debts[0]).toEqual({ ...original, balance: 296_000, monthPaid: { month: '2026-10', amount: 4_000 } });
+
+    // Undo puts the debt back exactly as it was.
+    await undoButton(page).click();
+    await expect(card).toContainText('$3,000');
+    await expect(month).toContainText('$0 paid · $100 to go');
+    await expect(payoff).toHaveText('Paid off in about 4 yrs (Oct 2030)');
+    expect((await stored(page)).debts[0]).toEqual(original);
+
+    // Chip away at it: $40, then the $60 that's left.
+    for (const [expected, typed] of [['100', '40'], ['60', null]] as const) {
+      await page.getByRole('button', { name: 'Log a payment on Credit Card' }).click();
+      s = sheet(page, 'log-payment-sheet');
+      await expect(s.getByLabel('How much did you pay?')).toHaveValue(expected);
+      if (typed) await s.getByLabel('How much did you pay?').fill(typed);
+      await s.getByRole('button', { name: 'Log payment' }).click();
+      await expect(s).toBeHidden();
+    }
+    await expect(month).toContainText("This month's payment: $100");
+    await expect(month).toContainText('Paid for this month');
+    await expect(card).toContainText('$2,900');
+
+    // Home: this month's debt payments are done, and Left Over doesn't change (the budget already planned for them).
+    await goTab(page, 'Home');
+    await expect(page.getByTestId('home-debt-this-month')).toHaveText("This month's debt payments are all paid ($100).");
+    await expect(page.getByTestId('left-over')).toHaveText('$540');
+    await expectCents(page.getByTestId('breakdown-debt'), 10_000);
+  });
+
+  test('a payment that clears the balance celebrates', async ({ page }) => {
+    await openApp(page, budget({ incomes: [income()], debts: [debt({ name: 'Doctor bill', type: 'medical', balance: 7_500, rateBps: 0, minPayment: 10_000 })] }));
+    // The minimum is never more than what's owed.
+    await expect(page.getByTestId('left-over')).toHaveText('$1,925');
+    await goTab(page, 'Debt');
+    await expect(debtCard(page, 'Doctor bill')).toContainText("This month's payment: $75");
+    await page.getByRole('button', { name: 'Log a payment on Doctor bill' }).click();
+    const s = sheet(page, 'log-payment-sheet');
+    await expect(s.getByLabel('How much did you pay?')).toHaveValue('75');
+    await s.getByRole('button', { name: 'Log payment' }).click();
+    const party = page.getByRole('dialog', { name: 'Paid off!' });
+    await expect(party).toContainText('You paid off Doctor bill. 🎉');
+    await party.getByRole('button', { name: 'Done' }).click();
+    await expect(party).toBeHidden();
+    await expect(debtCard(page, 'Doctor bill')).toContainText('Paid off 🎉');
+    await expect(page.getByRole('button', { name: 'Log a payment on Doctor bill' })).toHaveCount(0);
+    await expect(page.getByTestId('debt-free-date')).toHaveText("You're debt-free! 🎉");
+    // This month's budget already counted the payment.
+    await goTab(page, 'Home');
+    await expect(page.getByTestId('left-over')).toHaveText('$1,925');
+  });
+
+  test('each debt shows its own payoff time, or why it will not be paid off', async ({ page }) => {
+    await openApp(
+      page,
+      budget({
+        incomes: [income({ amount: 400_000 })],
+        debts: [
+          debt({ name: 'Phone plan', type: 'other', balance: 120_000, rateBps: 0, minPayment: 10_000 }),
+          debt({ name: 'Store card', balance: 1_000_000, rateBps: 2400, minPayment: 10_000 }),
+        ],
+      }),
+    );
+    await goTab(page, 'Debt');
+    const [phone, store] = (await stored(page)).debts;
+    await expect(page.getByTestId(`debt-payoff-${phone.id}`)).toHaveText('Paid off in about 1 yr (Oct 2027)');
+    await expect(page.getByTestId(`debt-payoff-${store.id}`)).toHaveText(
+      "Won't be paid off at this pace: this balance will keep growing.",
+    );
+    // No date to pick anywhere: the debt sheet has no target date.
+    await page.getByRole('button', { name: 'Edit Phone plan' }).click();
+    await expect(sheet(page, 'debt-sheet').getByLabel(/date/i)).toHaveCount(0);
+  });
+});

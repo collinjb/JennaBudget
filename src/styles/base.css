@@ -312,7 +312,8 @@ ol {
 
 .btn--sm {
   min-height: 44px;
-  padding: 0 14px;
+  /* Room above and below when larger text wraps the label onto two lines. */
+  padding: 6px 14px;
   font-size: var(--fs-subhead);
   border-radius: 12px;
 }

@@ -5,6 +5,8 @@ import {
   expect,
   expectHomeAddsUp,
   goal,
+  goTab,
+  sheet,
   income,
   openApp,
   parseMoney,
@@ -117,6 +119,75 @@ test.describe('Smart Plan', () => {
     await expect(page.getByRole('button', { name: 'Use this plan' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Check Bills' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Bills' })).toBeVisible();
+  });
+});
+
+test.describe('Smart Plan: savings goals with a date', () => {
+  test('lists the goals with a date as set automatically (not adjustable)', async ({ page }) => {
+    await openApp(
+      page,
+      budget({
+        incomes: [income()],
+        bills: [bill()],
+        goals: [
+          goal({ name: 'Trip', target: 130_000, saved: 10_000, targetDate: '2027-09-15' }),
+          goal({ name: 'Laptop', emoji: '💻', target: 120_000, saved: 0, monthly: 5_000 }),
+        ],
+      }),
+    );
+    await page.getByTestId('plan-card').getByRole('button', { name: 'See the Smart Plan' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Smart Plan' })).toBeVisible();
+    const dated = page.getByRole('region', { name: 'Set automatically (goals with a date)' });
+    await expect(dated).toContainText('These come out first so you hit your dates.');
+    // $1,200 left over the 12 months October … September = $100.
+    await expect(dated.getByRole('listitem')).toHaveCount(1);
+    await expect(dated.getByRole('listitem')).toContainText('Trip$100 this month · by September 2027');
+    // The plan suggests amounts only for the other goal.
+    const suggested = page.getByRole('region', { name: 'Suggested changes' });
+    await expect(suggested).toContainText('Laptop');
+    await expect(suggested).not.toContainText('Trip');
+    await expect(page.getByTestId('plan-goals-short')).toHaveCount(0);
+  });
+
+  test('warns when the goals with a date need more than there is, on Home and in the plan', async ({ page }) => {
+    await openApp(
+      page,
+      budget({
+        incomes: [income({ amount: 100_000 })],
+        bills: [bill()],
+        // $6,000 by March 2027: $1,000 a month for October … March, but only $200 is free after the bills.
+        goals: [goal({ name: 'Trip', target: 600_000, saved: 0, targetDate: '2027-03-15' })],
+      }),
+    );
+    await expect(page.getByTestId('left-over')).toHaveText("You're $800 over");
+    const card = page.getByTestId('plan-card');
+    await expect(card).toContainText('Your savings goals need more than you have');
+    await expect(card).toContainText(
+      'Your savings goals with dates need $800 more each month than you have after bills. Pushing a date back or lowering a goal would help.',
+    );
+    await expect(card).not.toContainText('We found a better way');
+
+    await card.getByRole('button', { name: 'See the Smart Plan' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Smart Plan' })).toBeVisible();
+    const warning = page.getByTestId('plan-goals-short');
+    await expect(warning.getByRole('heading', { name: 'Your savings goals need more than you have' })).toBeVisible();
+    await expect(warning).toContainText('need $800 more each month');
+    await expect(page.getByRole('region', { name: 'Set automatically (goals with a date)' })).toContainText(
+      'Trip$1,000 this month · by March 2027',
+    );
+    await warning.getByRole('button', { name: 'Go to Savings & Fun' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Savings & Fun' })).toBeVisible();
+
+    // A smaller goal fits: $1,000 by March = $167 a month.
+    await page.getByRole('button', { name: 'Edit Trip' }).click();
+    const s = sheet(page, 'goal-sheet');
+    await s.getByLabel('Goal amount').fill('1000');
+    await expect(s.getByTestId('goal-auto-amount')).toContainText("We'll set aside about $167 a month.");
+    await s.getByRole('button', { name: 'Save changes' }).click();
+    await expect(s).toBeHidden();
+    await goTab(page, 'Home');
+    await expect(page.getByTestId('left-over')).toHaveText('$33');
+    await expect(card).not.toContainText('Your savings goals need more than you have');
   });
 });
 
