@@ -236,9 +236,9 @@ type Collection = (typeof COLLECTIONS)[number];
 const ITEM_DEFAULTS: Record<Collection, Obj> = {
   incomes: { semimonthlyDays: [1, 15] },
   bills: { emoji: '🧾', paidMonth: null },
-  debts: { type: 'other' },
+  debts: { type: 'other', monthPaid: null },
   spending: { emoji: '💵', kind: 'need' },
-  goals: { emoji: '🎯', saved: 0, monthly: 0, targetDate: null, isEmergencyFund: false },
+  goals: { emoji: '🎯', saved: 0, monthly: 0, targetDate: null, isEmergencyFund: false, monthDeposit: null },
 };
 
 function migrateInternal(raw: unknown): { value: unknown; changed: boolean } {
@@ -407,6 +407,19 @@ class Reader {
     return v;
   }
 
+  /** null, or { month: 'YYYY-MM', amount: whole cents, may be negative (money taken out) }. */
+  monthDeposit(key: string): { month: string; amount: number } | null {
+    const v = this.has(key);
+    if (v === null) return null;
+    if (!isObj(v)) this.fail(`the ${label(key)} isn't valid.`);
+    const { month, amount } = v as { month?: unknown; amount?: unknown };
+    if (!isMonthKey(month)) this.fail(`the ${label(key)} has a month that isn't real.`);
+    if (typeof amount !== 'number' || !Number.isInteger(amount) || Math.abs(amount) > MAX_MONEY_CENTS) {
+      this.fail(`the ${label(key)} isn't a valid amount.`);
+    }
+    return { month: month as string, amount: amount as number };
+  }
+
   monthOrNull(key: string): string | null {
     const v = this.has(key);
     if (v === null) return null;
@@ -465,6 +478,8 @@ const FIELD_LABELS: Record<string, string> = {
   saved: 'amount saved',
   targetDate: 'target date',
   isEmergencyFund: 'safety net',
+  monthDeposit: 'money added this month',
+  monthPaid: 'payments made this month',
   payoffMethod: 'payoff method',
   extraDebtPayment: 'extra debt payment',
   theme: 'theme',
@@ -541,6 +556,7 @@ function readDebt(r: Reader): Debt {
     rateBps: r.rate('rateBps'),
     minPayment: r.money('minPayment'),
     dueDay: r.day('dueDay'),
+    monthPaid: r.monthDeposit('monthPaid'),
   };
 }
 
@@ -564,6 +580,7 @@ function readGoal(r: Reader): Goal {
     monthly: r.money('monthly'),
     targetDate: r.dateOrNull('targetDate'),
     isEmergencyFund: r.bool('isEmergencyFund'),
+    monthDeposit: r.monthDeposit('monthDeposit'),
   };
 }
 

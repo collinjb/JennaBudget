@@ -3,6 +3,8 @@ import { roundDiv } from './money';
 import { billsForMonth, homeBreakdown, monthlySummary, type MonthlySummary } from './summary';
 import { bill, budget, debt, goal, income, spending } from './testUtils';
 
+const TODAY = '2026-10-08';
+
 function sample() {
   return budget({
     incomes: [
@@ -35,7 +37,7 @@ function sample() {
 
 describe('monthlySummary', () => {
   it('adds everything up', () => {
-    expect(monthlySummary(sample())).toEqual({
+    expect(monthlySummary(sample(), TODAY)).toEqual({
       income: 414_167,
       bills: 103_158,
       debtMinimums: 7_500,
@@ -51,7 +53,7 @@ describe('monthlySummary', () => {
   });
 
   it('left over = income - outgo and outgo = bills + debt + spending + savings', () => {
-    const s = monthlySummary(sample());
+    const s = monthlySummary(sample(), TODAY);
     expect(s.outgo).toBe(s.bills + s.debt + s.spending + s.savings);
     expect(s.leftOver).toBe(s.income - s.outgo);
   });
@@ -59,14 +61,14 @@ describe('monthlySummary', () => {
   it('counts extra only while some debt has a balance', () => {
     const data = sample();
     data.debts = data.debts.map((d) => ({ ...d, balance: 0 }));
-    const s = monthlySummary(data);
+    const s = monthlySummary(data, TODAY);
     expect(s.debtMinimums).toBe(0);
     expect(s.debtExtra).toBe(0);
     expect(s.debt).toBe(0);
   });
 
   it('caps each minimum at the balance', () => {
-    const s = monthlySummary(budget({ debts: [debt({ balance: 1_234, minPayment: 5_000 })] }));
+    const s = monthlySummary(budget({ debts: [debt({ balance: 1_234, minPayment: 5_000 })] }), TODAY);
     expect(s.debtMinimums).toBe(1_234);
   });
 
@@ -78,20 +80,20 @@ describe('monthlySummary', () => {
           goal({ monthly: 7_000, saved: 0, target: 0 }),
           goal({ monthly: 1_100, saved: 149_999, target: 150_000 }),
         ],
-      }),
+      }), TODAY
     );
     expect(s.savings).toBe(1_100);
   });
 
   it('empty budget is all zeros', () => {
-    const s = monthlySummary(budget());
+    const s = monthlySummary(budget(), TODAY);
     expect(Object.values(s).every((v) => v === 0)).toBe(true);
   });
 });
 
 describe('homeBreakdown', () => {
   it('parts are whole dollars and sum to the whole-dollar income', () => {
-    const s = monthlySummary(sample());
+    const s = monthlySummary(sample(), TODAY);
     const h = homeBreakdown(s);
     expect(h.over).toBe(false);
     expect(h.parts.map((p) => p.key)).toEqual(['bills', 'debt', 'savings', 'spending', 'leftOver']);
@@ -141,7 +143,7 @@ describe('homeBreakdown', () => {
         incomes: [income({ frequency: 'monthly', amount: 100_000 })],
         bills: [bill({ amount: 90_050 })],
         spending: [spending({ monthly: 20_000 })],
-      }),
+      }), TODAY
     );
     expect(s.leftOver).toBe(-10_050);
     const h = homeBreakdown(s);
@@ -155,7 +157,7 @@ describe('homeBreakdown', () => {
 
   it('over by a few cents still shows at least $1 over', () => {
     const s = monthlySummary(
-      budget({ incomes: [income({ frequency: 'monthly', amount: 100_000 })], bills: [bill({ amount: 100_030 })] }),
+      budget({ incomes: [income({ frequency: 'monthly', amount: 100_000 })], bills: [bill({ amount: 100_030 })] }), TODAY
     );
     const h = homeBreakdown(s);
     expect(h.over).toBe(true);
@@ -178,7 +180,7 @@ describe('homeBreakdown', () => {
           incomes: [income({ frequency: 'monthly', amount: pay })],
           bills: [bill({ amount: pay - 500 + rand(1_000) }), bill({ id: 'b2', amount: rand(5_000) })],
           spending: [spending({ monthly: rand(3_000) })],
-        }),
+        }), TODAY
       );
       const h = homeBreakdown(s);
       if (!h.over) continue;
@@ -189,7 +191,7 @@ describe('homeBreakdown', () => {
 
   it('exactly zero left over is not over', () => {
     const s = monthlySummary(
-      budget({ incomes: [income({ frequency: 'monthly', amount: 100_000 })], bills: [bill({ amount: 100_000 })] }),
+      budget({ incomes: [income({ frequency: 'monthly', amount: 100_000 })], bills: [bill({ amount: 100_000 })] }), TODAY
     );
     const h = homeBreakdown(s);
     expect(h.over).toBe(false);
@@ -252,5 +254,31 @@ describe('billsForMonth', () => {
       leftToPay: 0,
       totalThisMonth: 0,
     });
+  });
+});
+
+describe('monthlySummary: dates and this month', () => {
+  it('a goal with a target date sets aside its automatic amount, not its monthly field', () => {
+    const s = monthlySummary(
+      budget({ goals: [goal({ target: 120_000, saved: 0, monthly: 1, targetDate: '2027-09-30' })] }),
+      TODAY,
+    );
+    expect(s.savings).toBe(10_000); // $1,200 over 12 months
+  });
+
+  it("paying a debt down during the month does not change this month's budget", () => {
+    const atStart = monthlySummary(budget({ debts: [debt({ balance: 3_000, minPayment: 5_000 })] }), TODAY);
+    const paidOff = monthlySummary(
+      budget({ debts: [debt({ balance: 0, minPayment: 5_000, monthPaid: { month: '2026-10', amount: 3_000 } })] }),
+      TODAY,
+    );
+    expect(paidOff.debtMinimums).toBe(atStart.debtMinimums);
+    expect(paidOff.debtMinimums).toBe(3_000);
+    // Next month it's gone.
+    const nextMonth = monthlySummary(
+      budget({ debts: [debt({ balance: 0, minPayment: 5_000, monthPaid: { month: '2026-10', amount: 3_000 } })] }),
+      '2026-11-02',
+    );
+    expect(nextMonth.debtMinimums).toBe(0);
   });
 });

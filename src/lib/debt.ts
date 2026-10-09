@@ -41,6 +41,8 @@ export interface PayoffResult {
   timeline: Cents[];
   /** Sum of minimums (of debts with balance > 0) + extra: the fixed monthly amount thrown at debt. */
   monthlyBudget: Cents;
+  /** What the first simulated month pays on each debt (by id): its minimum, plus extra if it's next in line. */
+  firstMonthPayments: Record<string, Cents>;
 }
 
 /**
@@ -87,6 +89,12 @@ export function simulatePayoff(debts: Debt[], opts: PayoffOptions): PayoffResult
   let totalInterest = 0;
   let totalPaid = 0;
   let months: number | null = order.length === 0 ? 0 : null;
+  const firstMonthPayments: Record<string, Cents> = Object.fromEntries(order.map((d) => [d.id, 0]));
+  const pay = (i: number, amount: Cents, month: number) => {
+    balances[i] -= amount;
+    totalPaid += amount;
+    if (month === 1) firstMonthPayments[order[i].id] += amount;
+  };
 
   for (let month = 1; month <= maxMonths && months === null; month++) {
     // 1) Interest on every debt that still has a balance.
@@ -102,18 +110,16 @@ export function simulatePayoff(debts: Debt[], opts: PayoffOptions): PayoffResult
     // 3) Minimums (never more than what's owed, never more than what's in the pool).
     for (let i = 0; i < order.length && pool > 0; i++) {
       if (balances[i] <= 0) continue;
-      const pay = Math.min(minimumDue(order[i].minPayment, balances[i]), pool);
-      balances[i] -= pay;
-      pool -= pay;
-      totalPaid += pay;
+      const amount = Math.min(minimumDue(order[i].minPayment, balances[i]), pool);
+      pay(i, amount, month);
+      pool -= amount;
     }
     // 4) Whatever is left goes to debts in payoff order, cascading to the next one.
     for (let i = 0; i < order.length && pool > 0; i++) {
       if (balances[i] <= 0) continue;
-      const pay = Math.min(balances[i], pool);
-      balances[i] -= pay;
-      pool -= pay;
-      totalPaid += pay;
+      const amount = Math.min(balances[i], pool);
+      pay(i, amount, month);
+      pool -= amount;
     }
     total = 0;
     for (let i = 0; i < order.length; i++) {
@@ -147,7 +153,44 @@ export function simulatePayoff(debts: Debt[], opts: PayoffOptions): PayoffResult
     perDebt,
     timeline,
     monthlyBudget,
+    firstMonthPayments,
   };
+}
+
+/** Payments logged on this debt during `month` (0 if none, or if the log is from another month). */
+export function debtPaidThisMonth(debt: Debt, month: MonthKey): Cents {
+  return debt.monthPaid && debt.monthPaid.month === month ? debt.monthPaid.amount : 0;
+}
+
+/** The balance when `month` began: today's balance plus what was paid this month. */
+export function startOfMonthBalance(debt: Debt, month: MonthKey): Cents {
+  return debt.balance + Math.max(0, debtPaidThisMonth(debt, month));
+}
+
+export interface DebtMonth {
+  id: string;
+  /**
+   * This month's payment goal: the debt's share of (all minimums + planned extra), worked out from the balances as
+   * they were when the month began, so it stays put while payments are logged ("chipped away") during the month.
+   */
+  goal: Cents;
+  /** Logged so far this month. */
+  paid: Cents;
+  /** max(0, goal − paid) */
+  toGo: Cents;
+}
+
+/** Payment goals for this month, one per debt that had a balance when the month began (same order as `debts`). */
+export function debtsThisMonth(debts: Debt[], method: PayoffMethod, extra: Cents, month: MonthKey): DebtMonth[] {
+  const atStart = debts
+    .map((d) => ({ ...d, balance: startOfMonthBalance(d, month) }))
+    .filter((d) => d.balance > 0);
+  const sim = simulatePayoff(atStart, { method, extra, startMonth: month, maxMonths: 1 });
+  return atStart.map((d) => {
+    const goal = sim.firstMonthPayments[d.id] ?? 0;
+    const paid = Math.max(0, debtPaidThisMonth(debts.find((x) => x.id === d.id) as Debt, month));
+    return { id: d.id, goal, paid, toGo: Math.max(0, goal - paid) };
+  });
 }
 
 /**

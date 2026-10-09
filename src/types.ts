@@ -61,6 +61,11 @@ export interface Debt {
   minPayment: Cents;
   /** 1..31 day of month the payment is due (31 = last day in shorter months). */
   dueDay: number;
+  /**
+   * Payments logged ("chipped away") during `month`; each one also lowered the balance. Only the latest month is
+   * kept. Lets the debt show "$120 of $250 paid this month" against a goal that stays put all month.
+   */
+  monthPaid: { month: MonthKey; amount: Cents } | null;
 }
 
 /** A monthly spending bucket, e.g. Groceries (need) or Fun Money (fun). */
@@ -79,12 +84,20 @@ export interface Goal {
   emoji: string;
   target: Cents;
   saved: Cents;
-  /** Planned monthly contribution. */
+  /**
+   * Planned monthly contribution for a goal WITHOUT a target date. A goal with a target date sets its own amount
+   * (see projectGoal): this value is ignored then, and comes back if the date is removed.
+   */
   monthly: Cents;
-  /** Optional deadline. */
+  /** Optional deadline. With one, the monthly amount is automatic and catches up after a short month. */
   targetDate: ISODate | null;
   /** True for the safety-net / emergency fund. At most one goal should have this. */
   isEmergencyFund: boolean;
+  /**
+   * Money put in (or taken out, negative) with "Add money" during `month`. Only the latest month is kept; it tells a
+   * dated goal how much of this month's amount is already saved.
+   */
+  monthDeposit: { month: MonthKey; amount: Cents } | null;
 }
 
 export type PayoffMethod = 'avalanche' | 'snowball';

@@ -1,5 +1,5 @@
 import type { BudgetData, Cents, Debt, Goal, ISODate, MonthKey, PayoffMethod, SpendingCategory } from '../types';
-import { compareISO, formatMonth, monthKey } from './dates';
+import { monthKey } from './dates';
 import { interestWarnings, MAX_PAYOFF_MONTHS, payoffOrder, simulatePayoff, type InterestWarningKind } from './debt';
 import { billMonthly } from './frequency';
 import { projectGoal, type GoalProjection } from './goals';
@@ -58,6 +58,13 @@ export interface SmartPlan {
   };
   /** True when feasible and some change moves by >= PLAN_CONFIG.MIN_CHANGE (or adds an item). Drives the Home card. */
   hasSuggestions: boolean;
+  /** Goals with a target date: their automatic amounts come out first (like bills) and the plan never changes them. */
+  datedGoals: { id: string; name: string; emoji: string; thisMonth: Cents; targetDate: ISODate }[];
+  /**
+   * How much more those dated goals need this month than what's left after bills, minimums and must-haves (0 when
+   * they fit). When > 0 everything adjustable is $0 and leftOverAfter is negative; a later date or smaller target helps.
+   */
+  goalsShortfall: Cents;
 }
 
 /** Plain-English "why" sentences. Exported so the UI and tests can reuse the exact wording. */
@@ -71,10 +78,6 @@ export const PLAN_WHY = {
   funTight: 'Money is tight, so this is smaller, but you still get some fun.',
   funTrimmed: 'This trims fun money a bit so everything else fits. You still get guilt-free money to enjoy.',
   funNone: "There's no room for fun money right now, but it comes back as soon as there is.",
-  deadlineFunded: (target: Cents, month: MonthKey) =>
-    `This is what it takes to reach ${formatMoney(target)} by ${formatMonth(month)}.`,
-  deadlineShort: (target: Cents, month: MonthKey) =>
-    `This is all that's left for it, so it won't reach ${formatMoney(target)} by ${formatMonth(month)}. A later date would help.`,
   pastDue: 'The date for this goal has passed. Pick a new date to get an exact amount.',
   openGoal: 'Steady progress toward this goal.',
   openGoalFinishes: 'This is enough to reach this goal next month.',
@@ -219,7 +222,7 @@ type DebtClass = 'none' | 'all' | 'high' | 'low' | 'other';
 
 /** Deterministic, rule-based. Algorithm specified in docs/SPEC.md (Smart Plan). Must be idempotent. */
 export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
-  const S = monthlySummary(data);
+  const S = monthlySummary(data, today);
   const income = S.income;
   const fixed = S.bills + S.debtMinimums + S.spendingNeeds;
   const startMonth = monthKey(today);
@@ -285,8 +288,18 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
           })),
       },
       hasSuggestions: false,
+      datedGoals: [],
+      goalsShortfall: 0,
     };
   }
+
+  // ----- Goals with a target date set their own amount (catching up after a short month), so they come out first,
+  // like bills, and the plan doesn't adjust them. -----
+  const datedGoals = data.goals.filter((g) => project(g).auto);
+  const datedTotal = datedGoals.reduce((sum, g) => sum + project(g).thisMonth, 0);
+  R -= datedTotal;
+  const goalsShortfall = R < 0 ? -R : 0;
+  if (R < 0) R = 0;
 
   const tight = R * 10_000 < income * ratioBps(C.TIGHT_RATIO);
   const lines: PlanLine[] = [];
@@ -308,9 +321,11 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
   }
 
   // ----- A) Safety net -----
-  const ef = data.goals.find((g) => g.isEmergencyFund) ?? null;
+  const efAny = data.goals.find((g) => g.isEmergencyFund) ?? null;
+  // A safety net with a target date runs on its own like other dated goals; the plan only adjusts one without a date.
+  const ef = efAny && !project(efAny).auto ? efAny : null;
   const efTarget = ef ? ef.target : capPlan(Math.max(C.STARTER_EMERGENCY_FUND, ceilToStep(fixed, 10_000)));
-  const efRemaining = Math.max(0, efTarget - (ef ? ef.saved : 0));
+  const efRemaining = efAny && !ef ? 0 : Math.max(0, efTarget - (ef ? ef.saved : 0));
   const efMonthly =
     efRemaining > 0 ? capPlan(Math.min(ceilDollars(efRemaining), shareDollars(R, C.EMERGENCY_FUND_SHARE))) : 0;
   R -= efMonthly;
@@ -333,7 +348,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
     };
     lines.push(line);
     goalLines.push({ line, goal: ef });
-  } else if (efMonthly > 0) {
+  } else if (!efAny && efMonthly > 0) {
     // Only suggest creating a safety net when there's money to put in it (an empty budget gets no suggestions).
     newGoal = {
       id: newId(),
@@ -344,6 +359,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
       monthly: efMonthly,
       targetDate: null,
       isEmergencyFund: true,
+      monthDeposit: null,
     };
     const line: PlanLine = {
       kind: 'newGoal',
@@ -400,29 +416,11 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
   const buffer = Math.min(C.BUFFER_MAX, shareDollars(R, C.BUFFER_SHARE));
   R -= buffer;
 
-  // ----- D) Goals with a future deadline, nearest deadline first -----
-  const others = data.goals.filter((g) => g !== ef && project(g).status !== 'reached');
-  const deadlineGoals = others
-    .map((g, index) => ({ g, index }))
-    .filter(({ g }) => g.targetDate !== null && project(g).status !== 'past-due')
-    .sort(
-      (a, b) =>
-        compareISO(a.g.targetDate ?? '', b.g.targetDate ?? '') || compareText(a.g.name, b.g.name) || a.index - b.index,
-    )
-    .map(({ g }) => g);
-  for (const g of deadlineGoals) {
-    const needed = capPlan(ceilDollars(project(g).neededPerMonth ?? 0));
-    const give = Math.min(needed, floorDollars(R));
-    R -= give;
-    const month = monthKey(g.targetDate ?? today);
-    const why = give >= needed ? PLAN_WHY.deadlineFunded(g.target, month) : PLAN_WHY.deadlineShort(g.target, month);
-    const line: PlanLine = { kind: 'goal', id: g.id, name: g.name, emoji: g.emoji, from: g.monthly, to: give, why };
-    lines.push(line);
-    goalLines.push({ line, goal: g });
-  }
+  // (Goals with a target date were taken out first, above: they set their own amount.)
+  const others = data.goals.filter((g) => g !== efAny && project(g).status !== 'reached' && !project(g).auto);
 
   // ----- E) Extra debt payments -----
-  const openGoals = others.filter((g) => g.targetDate === null || project(g).status === 'past-due');
+  const openGoals = others;
   let debtClass: DebtClass;
   let debtShare: number;
   if (activeDebts.length === 0) {
@@ -480,7 +478,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
   }
 
   const allocated = lines.reduce((s, l) => s + l.to, 0);
-  const leftOverAfter = income - fixed - allocated;
+  const leftOverAfter = income - fixed - datedTotal - allocated;
   const isNew = (l: PlanLine) => l.kind === 'newGoal' || l.kind === 'newSpending';
   // Every real change is listed (so nothing changes silently); only $5+ moves are worth nudging about on Home.
   const changes = lines.filter((l) => isNew(l) || l.to !== l.from);
@@ -513,6 +511,14 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
       })),
     },
     hasSuggestions: worthMentioning,
+    datedGoals: datedGoals.map((g) => ({
+      id: g.id,
+      name: g.name,
+      emoji: g.emoji,
+      thisMonth: project(g).thisMonth,
+      targetDate: g.targetDate as ISODate,
+    })),
+    goalsShortfall,
   };
 }
 

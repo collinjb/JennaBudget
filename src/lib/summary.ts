@@ -1,6 +1,7 @@
 import type { Bill, BudgetData, Cents, ISODate, MonthKey } from '../types';
-import { addMonthsToKey, compareISO, monthStart } from './dates';
-import { minimumDue } from './debt';
+import { addMonthsToKey, compareISO, monthKey, monthStart } from './dates';
+import { minimumDue, startOfMonthBalance } from './debt';
+import { projectGoal } from './goals';
 import { billMonthly, incomeMonthly } from './frequency';
 import { apportionDollars, roundDiv } from './money';
 import { billDueDates } from './schedule';
@@ -11,9 +12,12 @@ export interface MonthlySummary {
   income: Cents;
   /** Sum of billMonthly over all bills. */
   bills: Cents;
-  /** Sum of min(minPayment, balance) over debts with balance > 0. */
+  /**
+   * Sum of min(minPayment, balance) over debts that had a balance when this month began (balance + payments logged
+   * this month), so paying a debt down during the month doesn't change this month's budget.
+   */
   debtMinimums: Cents;
-  /** settings.extraDebtPayment if any debt has balance > 0, else 0. */
+  /** settings.extraDebtPayment if any debt had a balance when this month began, else 0. */
   debtExtra: Cents;
   /** debtMinimums + debtExtra */
   debt: Cents;
@@ -21,7 +25,10 @@ export interface MonthlySummary {
   spendingFun: Cents;
   /** spendingNeeds + spendingFun */
   spending: Cents;
-  /** Sum of goal.monthly for goals not yet reached (saved < target). */
+  /**
+   * What goals set aside this month (projectGoal().thisMonth): the automatic catch-up amount for goals with a target
+   * date, the chosen monthly amount for the others, nothing for reached goals.
+   */
   savings: Cents;
   /** bills + debt + spending + savings */
   outgo: Cents;
@@ -29,17 +36,19 @@ export interface MonthlySummary {
   leftOver: Cents;
 }
 
-export function monthlySummary(data: BudgetData): MonthlySummary {
+export function monthlySummary(data: BudgetData, today: ISODate): MonthlySummary {
+  const month = monthKey(today);
   const income = sum(data.incomes.map(incomeMonthly));
   const bills = sum(data.bills.map(billMonthly));
-  const activeDebts = data.debts.filter((d) => d.balance > 0);
+  const atStart = data.debts.map((d) => ({ minPayment: d.minPayment, balance: startOfMonthBalance(d, month) }));
+  const activeDebts = atStart.filter((d) => d.balance > 0);
   const debtMinimums = sum(activeDebts.map((d) => minimumDue(d.minPayment, d.balance)));
   const debtExtra = activeDebts.length > 0 ? Math.max(0, data.settings.extraDebtPayment) : 0;
   const debt = debtMinimums + debtExtra;
   const spendingNeeds = sum(data.spending.filter((s) => s.kind === 'need').map((s) => s.monthly));
   const spendingFun = sum(data.spending.filter((s) => s.kind !== 'need').map((s) => s.monthly));
   const spending = spendingNeeds + spendingFun;
-  const savings = sum(data.goals.filter((g) => g.saved < g.target).map((g) => g.monthly));
+  const savings = sum(data.goals.map((g) => projectGoal(g, today).thisMonth));
   const outgo = bills + debt + spending + savings;
   return {
     income,

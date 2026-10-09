@@ -40,6 +40,7 @@ export function debt(over: Partial<Debt> = {}): Debt {
     rateBps: 2499,
     minPayment: 5_000,
     dueDay: 22,
+    monthPaid: null,
     ...over,
   };
 }
@@ -58,6 +59,7 @@ export function goal(over: Partial<Goal> = {}): Goal {
     monthly: 0,
     targetDate: null,
     isEmergencyFund: false,
+    monthDeposit: null,
     ...over,
   };
 }

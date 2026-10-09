@@ -71,9 +71,10 @@ export function makeExampleBudget(today: ISODate): BudgetData {
   ];
 
   const debts: Debt[] = [
-    { id: newId(), name: 'Student Loan', type: 'student', balance: 1_450_000, rateBps: 680, minPayment: 16_500, dueDay: 15 },
-    { id: newId(), name: 'Credit Card', type: 'credit', balance: 240_000, rateBps: 2499, minPayment: 7_500, dueDay: 22 },
-    { id: newId(), name: 'Car Loan', type: 'car', balance: 820_000, rateBps: 590, minPayment: 24_500, dueDay: 5 },
+    // $80 already chipped off this month, to show "this month's payment" progress.
+    { id: newId(), name: 'Student Loan', type: 'student', balance: 1_442_000, rateBps: 680, minPayment: 16_500, dueDay: 15, monthPaid: { month: monthKey(today), amount: 8_000 } },
+    { id: newId(), name: 'Credit Card', type: 'credit', balance: 240_000, rateBps: 2499, minPayment: 7_500, dueDay: 22, monthPaid: null },
+    { id: newId(), name: 'Car Loan', type: 'car', balance: 820_000, rateBps: 590, minPayment: 24_500, dueDay: 5, monthPaid: null },
   ];
 
   const spending: SpendingCategory[] = [
@@ -93,6 +94,7 @@ export function makeExampleBudget(today: ISODate): BudgetData {
       monthly: 10_000,
       targetDate: null,
       isEmergencyFund: true,
+      monthDeposit: null,
     },
     {
       id: newId(),
@@ -103,6 +105,8 @@ export function makeExampleBudget(today: ISODate): BudgetData {
       monthly: 10_000,
       targetDate: inMonth(8, 15),
       isEmergencyFund: false,
+      // $50 already put in this month, to show this month's progress on a goal that sets its own amount.
+      monthDeposit: { month: monthKey(today), amount: 5_000 },
     },
   ];
 

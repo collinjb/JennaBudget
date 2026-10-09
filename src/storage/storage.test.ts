@@ -131,8 +131,9 @@ function sample(): BudgetData {
         rateBps: 2499,
         minPayment: 7_500,
         dueDay: 20,
+        monthPaid: null,
       },
-      { id: 'debt-2', name: 'Student Loan', type: 'student', balance: 1_200_000, rateBps: 0, minPayment: 0, dueDay: 31 },
+      { id: 'debt-2', name: 'Student Loan', type: 'student', balance: 1_200_000, rateBps: 0, minPayment: 0, dueDay: 31, monthPaid: null },
     ],
     spending: [
       { id: 'sp-1', name: 'Groceries', emoji: '🛒', monthly: 40_000, kind: 'need' },
@@ -148,6 +149,7 @@ function sample(): BudgetData {
         monthly: 5_000,
         targetDate: null,
         isEmergencyFund: true,
+        monthDeposit: null,
       },
       {
         id: 'goal-2',
@@ -158,6 +160,7 @@ function sample(): BudgetData {
         monthly: 15_000,
         targetDate: '2027-05-01',
         isEmergencyFund: false,
+        monthDeposit: null,
       },
     ],
     settings: {

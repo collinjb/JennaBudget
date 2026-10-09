@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { monthKey, todayISO } from '../lib/dates';
+import { startOfMonthBalance } from '../lib/debt';
 import { MAX_MONEY_CENTS } from '../lib/money';
 import { clearData, loadData, saveData, validateBudget } from '../storage/storage';
 import {
@@ -36,8 +38,13 @@ export interface BudgetActions {
   replaceAll(data: BudgetData): void;
   /** Mark a bill paid for `month`, or unpaid with null. */
   setBillPaid(id: string, month: MonthKey | null): void;
-  /** Add (or with a negative number, take out) money from a goal's saved amount. Clamped to 0..MAX. */
-  addToGoal(id: string, cents: Cents): void;
+  /**
+   * Add (or with a negative number, take out) money from a goal's saved amount, clamped to 0..MAX, and count it toward
+   * `month` (so a dated goal knows how much of this month's amount is in).
+   */
+  addToGoal(id: string, cents: Cents, month: MonthKey): void;
+  /** Log a payment on a debt during `month`: lowers the balance (never below 0) and counts toward this month's goal. */
+  payDebt(id: string, cents: Cents, month: MonthKey): void;
   /** Erase everything and start over with an empty budget. */
   reset(): void;
 }
@@ -85,9 +92,10 @@ function initialState(): InitialState {
 }
 
 /** Once every debt is paid off, a planned extra payment no longer means anything; drop it so it can't come back
- * silently (and quietly lower Left Over) when a new debt is added later. */
-function withoutStaleExtra(d: BudgetData): BudgetData {
-  if (d.settings.extraDebtPayment > 0 && !d.debts.some((x) => x.balance > 0)) {
+ * silently (and quietly lower Left Over) when a new debt is added later. A debt paid off during this month still
+ * counts until the month ends (this month's budget already planned for it). */
+function withoutStaleExtra(d: BudgetData, month: MonthKey = monthKey(todayISO())): BudgetData {
+  if (d.settings.extraDebtPayment > 0 && !d.debts.some((x) => startOfMonthBalance(x, month) > 0)) {
     return { ...d, settings: { ...d.settings, extraDebtPayment: 0 } };
   }
   return d;
@@ -190,12 +198,27 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       setBillPaid(id, month) {
         update((d) => ({ ...d, bills: d.bills.map((b) => (b.id === id ? { ...b, paidMonth: month } : b)) }));
       },
-      addToGoal(id, cents) {
+      addToGoal(id, cents, month) {
         update((d) => ({
           ...d,
-          goals: d.goals.map((g) =>
-            g.id === id ? { ...g, saved: Math.min(MAX_MONEY_CENTS, Math.max(0, g.saved + cents)) } : g,
-          ),
+          goals: d.goals.map((g) => {
+            if (g.id !== id) return g;
+            const saved = Math.min(MAX_MONEY_CENTS, Math.max(0, g.saved + cents));
+            const before = g.monthDeposit && g.monthDeposit.month === month ? g.monthDeposit.amount : 0;
+            // Count what actually moved (after clamping), so this month's progress always matches the saved amount.
+            return { ...g, saved, monthDeposit: { month, amount: before + (saved - g.saved) } };
+          }),
+        }));
+      },
+      payDebt(id, cents, month) {
+        update((d) => ({
+          ...d,
+          debts: d.debts.map((x) => {
+            if (x.id !== id) return x;
+            const balance = Math.max(0, x.balance - Math.max(0, cents));
+            const before = x.monthPaid && x.monthPaid.month === month ? x.monthPaid.amount : 0;
+            return { ...x, balance, monthPaid: { month, amount: before + (x.balance - balance) } };
+          }),
         }));
       },
       reset() {

@@ -42,7 +42,8 @@ function checkInvariants(data: BudgetData, plan: SmartPlan) {
     return;
   }
   expect(plan.shortfall).toBe(0);
-  expect(plan.leftOverAfter).toBeGreaterThanOrEqual(0);
+  if (plan.goalsShortfall > 0) expect(plan.leftOverAfter).toBe(-plan.goalsShortfall);
+  else expect(plan.leftOverAfter).toBeGreaterThanOrEqual(0);
   for (const l of plan.lines) {
     expect(l.to % 100).toBe(0);
     expect(l.to).toBeGreaterThanOrEqual(0);
@@ -57,7 +58,7 @@ function checkInvariants(data: BudgetData, plan: SmartPlan) {
   const before = JSON.stringify(data);
   const applied = applySmartPlan(data, plan);
   expect(JSON.stringify(data)).toBe(before); // never mutates
-  expect(monthlySummary(applied).leftOver).toBe(plan.leftOverAfter);
+  expect(monthlySummary(applied, today).leftOver).toBe(plan.leftOverAfter);
   const again = buildSmartPlan(applied, today);
   expect(again.changes).toEqual([]);
   expect(again.hasSuggestions).toBe(false);
@@ -97,7 +98,7 @@ describe('infeasible: bills + minimums + must-haves exceed income', () => {
     expect(plan.hasSuggestions).toBe(false);
     expect(plan.newGoal).toBeNull();
     expect(plan.newSpending).toBeNull();
-    expect(plan.leftOverBefore).toBe(monthlySummary(data).leftOver);
+    expect(plan.leftOverBefore).toBe(monthlySummary(data, today).leftOver);
     expect(plan.leftOverAfter).toBe(plan.leftOverBefore);
   });
 
@@ -194,7 +195,7 @@ describe('comfortable budget with nothing set up yet', () => {
     expect(applied.goals).toHaveLength(1);
     expect(applied.goals[0]).toEqual(plan.newGoal);
     expect(applied.spending[1]).toEqual(plan.newSpending);
-    expect(monthlySummary(applied).leftOver).toBe(130_000);
+    expect(monthlySummary(applied, today).leftOver).toBe(130_000);
     checkInvariants(data, plan);
   });
 
@@ -313,70 +314,71 @@ describe('safety net', () => {
   });
 });
 
-describe('goals with a deadline', () => {
-  const data = budget({
-    incomes: [pay(400_000)],
-    bills: [bill({ amount: 200_000 })],
-    spending: [spending({ name: 'Fun', monthly: 20_000, kind: 'fun' })],
-    goals: [
-      fullEF(),
-      goal({ id: 'wedding', name: 'Wedding', target: 600_000, targetDate: '2027-04-15', monthly: 50_000 }), // 6 months
-      goal({ id: 'car', name: 'Car', target: 500_000, targetDate: '2027-02-01', monthly: 0 }), // 4 months
-      goal({ id: 'trip', name: 'Trip', target: 120_000, targetDate: '2027-10-01', monthly: 10_000 }), // 12 months
-    ],
-  });
-  const plan = buildSmartPlan(data, today);
+describe('goals with a target date', () => {
+  // Oct..Feb = 5 months → $1,000 · Oct..Apr = 7 months → $857.15 → $858 · Oct 2026..Oct 2027 = 13 months → $93
+  const dated = () => [
+    goal({ id: 'wedding', name: 'Wedding', target: 600_000, targetDate: '2027-04-15', monthly: 50_000 }),
+    goal({ id: 'car', name: 'Car', target: 500_000, targetDate: '2027-02-01', monthly: 0 }),
+    goal({ id: 'trip', name: 'Trip', target: 120_000, targetDate: '2027-10-01', monthly: 10_000 }),
+  ];
 
-  it('are funded nearest deadline first and capped by what is left', () => {
-    // free $2,000 → fun min($400, $1,000) = $400 → buffer $100 → $1,500 for goals
-    expect(line(plan, 'Fun').to).toBe(40_000);
-    expect(plan.lines.map((l) => l.id)).toEqual(['ef', expect.any(String), 'car', 'wedding', 'trip']);
-    expect(line(plan, 'car').to).toBe(125_000); // needs $1,250/month, fully funded
-    expect(line(plan, 'car').why).toBe('This is what it takes to reach $5,000 by February 2027.');
-    expect(line(plan, 'wedding').to).toBe(25_000); // needs $1,000 but only $250 is left
-    expect(line(plan, 'wedding').why).toBe(
-      "This is all that's left for it, so it won't reach $6,000 by April 2027. A later date would help.",
-    );
-    expect(line(plan, 'trip').to).toBe(0);
-    expect(plan.leftOverAfter).toBe(10_000);
+  it('come out first, like bills, and the plan never changes them', () => {
+    const data = budget({
+      incomes: [pay(400_000)],
+      bills: [bill({ amount: 200_000 })],
+      spending: [spending({ name: 'Fun', monthly: 20_000, kind: 'fun' })],
+      goals: [fullEF(), ...dated()],
+    });
+    const plan = buildSmartPlan(data, today);
+    expect(plan.datedGoals.map((g) => [g.id, g.thisMonth])).toEqual([
+      ['wedding', 85_800],
+      ['car', 100_000],
+      ['trip', 9_300],
+    ]);
+    expect(plan.lines.some((l) => ['wedding', 'car', 'trip'].includes(l.id ?? ''))).toBe(false);
+    expect(plan.goalsShortfall).toBe(0);
+    // $2,000 free − $1,951 for dated goals = $49 → tight: fun min($200, $24) = $24 → buffer $2
+    expect(line(plan, 'Fun').to).toBe(2_400);
+    expect(plan.leftOverAfter).toBe(2_500);
     checkInvariants(data, plan);
   });
 
-  it('impact shows reach months before and after', () => {
-    const car = plan.impact.goals.find((g) => g.id === 'car');
-    expect(car).toEqual({ id: 'car', name: 'Car', emoji: '✈️', before: null, after: '2027-02' });
-    const wedding = plan.impact.goals.find((g) => g.id === 'wedding');
-    expect(wedding?.before).toBe('2027-10'); // $6,000 / $500
-    expect(wedding?.after).toBe('2028-10'); // $6,000 / $250 = 24 months
-  });
-
-  it('needed per month is rounded up to whole dollars', () => {
-    // $1,000 over 7 months = $142.857… => $143
-    const d = budget({
-      incomes: [pay(500_000)],
-      goals: [fullEF(), goal({ id: 'g', target: 100_000, targetDate: '2027-05-01' })],
-    });
-    const p = buildSmartPlan(d, today);
-    expect(line(p, 'g').to).toBe(14_300);
-    expect(line(p, 'g').why).toBe(PLAN_WHY.deadlineFunded(100_000, '2027-05'));
-    checkInvariants(d, p);
-  });
-
-  it('same deadline: alphabetical', () => {
-    const d = budget({
+  it("when they need more than what's left: say how much, and set everything adjustable to $0", () => {
+    const data = budget({
       incomes: [pay(300_000)],
       bills: [bill({ amount: 200_000 })],
-      goals: [
-        fullEF(),
-        goal({ id: 'z', name: 'Zoo', target: 1_000_000, targetDate: '2027-04-01' }),
-        goal({ id: 'a', name: 'Art', target: 1_000_000, targetDate: '2027-04-01' }),
-      ],
+      spending: [spending({ name: 'Fun', monthly: 20_000, kind: 'fun' })],
+      goals: [fullEF(), ...dated().slice(0, 2)],
     });
-    const p = buildSmartPlan(d, today);
-    const ids = p.lines.filter((l) => l.kind === 'goal' && l.id !== 'ef').map((l) => l.id);
-    expect(ids).toEqual(['a', 'z']);
-    expect(line(p, 'a').to).toBeGreaterThan(0);
-    expect(line(p, 'z').to).toBe(0);
+    const plan = buildSmartPlan(data, today);
+    expect(plan.feasible).toBe(true);
+    expect(plan.goalsShortfall).toBe(85_800); // $1,000 free, $1,858 needed
+    expect(line(plan, 'Fun').to).toBe(0);
+    expect(plan.leftOverAfter).toBe(-85_800);
+    checkInvariants(data, plan);
+  });
+
+  it('a safety net with a date runs on its own (no safety-net line, no new one)', () => {
+    const data = budget({
+      incomes: [pay(500_000)],
+      goals: [goal({ id: 'ef', name: 'Emergency Fund', target: 120_000, targetDate: '2027-09-30', isEmergencyFund: true })],
+    });
+    const plan = buildSmartPlan(data, today);
+    expect(plan.datedGoals.map((g) => g.id)).toEqual(['ef']);
+    expect(plan.lines.some((l) => l.id === 'ef' || l.kind === 'newGoal')).toBe(false);
+    expect(plan.newGoal).toBeNull();
+    checkInvariants(data, plan);
+  });
+
+  it('a short month raises the dated amount the plan works around', () => {
+    const base = { id: 'g', name: 'Trip', target: 120_000, targetDate: '2027-09-30' };
+    const onPlan = budget({ incomes: [pay(500_000)], goals: [fullEF(), goal({ ...base, saved: 10_000, monthDeposit: { month: '2026-10', amount: 10_000 } })] });
+    const short = budget({ incomes: [pay(500_000)], goals: [fullEF(), goal({ ...base, saved: 4_000, monthDeposit: { month: '2026-10', amount: 4_000 } })] });
+    const nov = '2026-11-02';
+    const a = buildSmartPlan(onPlan, nov).datedGoals[0].thisMonth;
+    const b = buildSmartPlan(short, nov).datedGoals[0].thisMonth;
+    expect(a).toBe(10_000); // $1,100 / 11
+    expect(b).toBe(10_600); // $1,160 / 11 → rounded up
   });
 
   it('reached goals are left out; past-due goals are treated as open goals', () => {
@@ -644,7 +646,7 @@ describe('over budget but feasible', () => {
       spending: [spending({ monthly: 50_000, kind: 'need' }), spending({ id: 'fun', name: 'Fun', monthly: 80_000, kind: 'fun' })],
       goals: [goal({ id: 'g', name: 'Car', monthly: 60_000, target: 1_000_000 })],
     });
-    expect(monthlySummary(data).leftOver).toBe(-40_000);
+    expect(monthlySummary(data, today).leftOver).toBe(-40_000);
     const plan = buildSmartPlan(data, today);
     expect(plan.feasible).toBe(true);
     expect(plan.hasSuggestions).toBe(true);
@@ -867,7 +869,7 @@ describe("buildSmartPlan: huge amounts stay inside the app's money limit", () =>
     expect(line(plan, 'fun').to).toBe(MAX_PLAN_AMOUNT);
     expect(line(plan, 'yacht').to).toBe(MAX_PLAN_AMOUNT);
     expect(line(plan, 'Extra debt payment').to).toBe(MAX_PLAN_AMOUNT);
-    const S = monthlySummary(data);
+    const S = monthlySummary(data, today);
     const allocated = plan.lines.reduce((a, l) => a + l.to, 0);
     expect(plan.leftOverAfter).toBe(S.income - S.bills - S.debtMinimums - S.spendingNeeds - allocated);
     expect(plan.leftOverAfter).toBeGreaterThan(MAX_MONEY_CENTS);

@@ -38,7 +38,7 @@ describe('makeExampleBudget', () => {
   });
 
   it.each(todays)('has a modest positive left over (%s)', (today) => {
-    const s = monthlySummary(makeExampleBudget(today));
+    const s = monthlySummary(makeExampleBudget(today), today);
     expect(s.leftOver).toBeGreaterThan(0);
     expect(s.leftOver).toBeLessThan(s.income * 0.15);
     expect(homeBreakdown(s).over).toBe(false);
@@ -80,7 +80,11 @@ describe('makeExampleBudget', () => {
     expect(rates).toEqual([590, 680, 2499]);
     const trip = d.goals.find((g) => g.name === 'Florida Trip');
     expect(trip?.targetDate).not.toBeNull();
-    expect(projectGoal(trip ?? d.goals[0], today).status).toBe('behind');
+    const tripP = projectGoal(trip ?? d.goals[0], today);
+    expect(tripP.status).toBe('on-track');
+    expect(tripP.auto).toBe(true);
+    expect(tripP.savedThisMonth).toBeGreaterThan(0);
+    expect(tripP.thisMonthToGo).toBeGreaterThan(0);
     const ef = d.goals.find((g) => g.isEmergencyFund);
     expect(projectGoal(ef ?? d.goals[0], today).status).toBe('no-deadline');
   });

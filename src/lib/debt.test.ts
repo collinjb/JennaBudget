@@ -3,7 +3,10 @@ import type { Debt } from '../types';
 import {
   MAX_PAYOFF_MONTHS,
   compareExtra,
+  debtPaidThisMonth,
+  debtsThisMonth,
   interestWarnings,
+  startOfMonthBalance,
   comparePayoffs,
   minimumDue,
   monthlyInterest,
@@ -398,5 +401,60 @@ describe('compareExtra', () => {
     const c = compareExtra([], 'snowball', 0, 10_000, start);
     expect(c.monthsSooner).toBe(0);
     expect(c.interestSaved).toBe(0);
+  });
+});
+
+describe("this month's payment goals (chip away during the month)", () => {
+  const month = '2026-10';
+  const card = (over: Partial<Debt> = {}): Debt => ({
+    id: 'card', name: 'Card', type: 'credit', balance: 300_000, rateBps: 2400, minPayment: 10_000, dueDay: 20, monthPaid: null, ...over,
+  });
+  const loan = (over: Partial<Debt> = {}): Debt => ({
+    id: 'loan', name: 'Loan', type: 'student', balance: 1_000_000, rateBps: 500, minPayment: 15_000, dueDay: 5, monthPaid: null, ...over,
+  });
+
+  it('each debt gets its minimum; the extra goes to the one next in line', () => {
+    const goals = debtsThisMonth([card(), loan()], 'avalanche', 20_000, month);
+    expect(goals).toEqual([
+      { id: 'card', goal: 30_000, paid: 0, toGo: 30_000 },
+      { id: 'loan', goal: 15_000, paid: 0, toGo: 15_000 },
+    ]);
+    const snow = debtsThisMonth([card(), loan()], 'snowball', 20_000, month);
+    expect(snow.find((g) => g.id === 'card')?.goal).toBe(30_000); // smallest balance is the card here too
+  });
+
+  it('logged payments count toward the goal, which stays put all month', () => {
+    const before = debtsThisMonth([card(), loan()], 'avalanche', 20_000, month);
+    const paid = card({ balance: 288_000, monthPaid: { month, amount: 12_000 } });
+    const after = debtsThisMonth([paid, loan()], 'avalanche', 20_000, month);
+    expect(after[0]).toEqual({ id: 'card', goal: before[0].goal, paid: 12_000, toGo: before[0].goal - 12_000 });
+    // Paying more than the goal: nothing left to go.
+    const over = debtsThisMonth([card({ balance: 250_000, monthPaid: { month, amount: 50_000 } })], 'avalanche', 0, month);
+    expect(over[0]).toMatchObject({ paid: 50_000, toGo: 0 });
+  });
+
+  it('a debt paid off this month still shows (its goal was planned at the start of the month)', () => {
+    const goals = debtsThisMonth([card({ balance: 0, monthPaid: { month, amount: 300_000 } })], 'avalanche', 0, month);
+    expect(goals).toHaveLength(1);
+    expect(goals[0].toGo).toBe(0);
+    expect(debtsThisMonth([card({ balance: 0, monthPaid: { month: '2026-09', amount: 300_000 } })], 'avalanche', 0, month)).toEqual([]);
+  });
+
+  it("payments from another month are ignored; start-of-month balance adds back this month's payments", () => {
+    const d = card({ balance: 280_000, monthPaid: { month: '2026-09', amount: 20_000 } });
+    expect(debtPaidThisMonth(d, month)).toBe(0);
+    expect(startOfMonthBalance(d, month)).toBe(280_000);
+    expect(startOfMonthBalance(card({ balance: 280_000, monthPaid: { month, amount: 20_000 } }), month)).toBe(300_000);
+  });
+
+  it('the goals add up to the monthly debt budget', () => {
+    const debts = [card(), loan(), card({ id: 'c2', name: 'Store', balance: 50_000, minPayment: 2_500 })];
+    const total = debtsThisMonth(debts, 'avalanche', 33_300, month).reduce((s, g) => s + g.goal, 0);
+    expect(total).toBe(10_000 + 15_000 + 2_500 + 33_300);
+  });
+
+  it('simulatePayoff reports what the first month pays on each debt', () => {
+    const sim = simulatePayoff([card(), loan()], { method: 'avalanche', extra: 20_000, startMonth: month });
+    expect(sim.firstMonthPayments).toEqual({ card: 30_000, loan: 15_000 });
   });
 });
