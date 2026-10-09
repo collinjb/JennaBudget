@@ -90,7 +90,13 @@ All in `src/lib`. Integer cents only; round half-up once at the end of each conv
   - `flat` (minimum = interest): "Your $100 payment only covers the interest, so this balance won't go down."
   - `no-payment` (balance > 0, minimum $0, any rate incl. 0%): "There's no monthly payment set, so this balance never
     gets paid down."
-- **Goals** (`projectGoal`): first contribution next month. months to goal = ceil(remaining ÷ monthly); reach month =
+- **Goals with a target date (automatic):** this month's amount = ceil-to-$1(remaining when the month began ÷ months left
+  including this one), capped at what's left. Re-split every month (short month → later months go up). Money added this
+  month (`monthDeposit`) counts toward it. The monthly summary uses this amount; the goal's `monthly` is ignored.
+- **Debt payment goals** (`debtsThisMonth`): each debt's first-month payment from a simulation started at start-of-month
+  balances (balance + payments logged this month); stays put while payments are logged. Summary debt minimums also use
+  start-of-month balances.
+- **Goals without a date** (`projectGoal`): first contribution next month. months to goal = ceil(remaining ÷ monthly); reach month =
   current month + that. With a deadline: monthsLeft = targetMonth − currentMonth; needed/month = ceil(remaining ÷
   monthsLeft) (deadline later this month: needed = everything left); `on-track` if monthly ≥ needed, else `behind`;
   deadline date before today and not reached → `past-due`.

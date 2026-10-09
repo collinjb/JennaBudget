@@ -41,6 +41,24 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
   guide the first steps; example data and restoring a backup are in Settings. `settings.onboarded` stays in saved data
   only so older data and backups load unchanged.
 
+## Savings goals and debt payments (owner's requests)
+- **Goals with a target date set their own monthly amount:** what was left when the month began ÷ the months left
+  including this one, rounded up to whole dollars (never more than what's left). It's worked out again every month, so a
+  short month raises the next months and the date is still met; extra money lowers them. It comes out of Left Over. The
+  goal's own monthly field is ignored while it has a date (and comes back if the date is removed).
+- **Goals without a date** keep the monthly amount you choose. With no deadline there's nothing to catch up to: missing a
+  month just moves the "you'll reach it by" month. The goal sheet suggests adding a date to get automatic catch-up.
+- **"Add money" is tracked per month** (`monthDeposit`) to show "This month: $40 of $100 saved".
+- **Smart Plan:** goals with a date come out first, like bills, and aren't adjusted. If they don't fit, the plan says how
+  much more they need (`goalsShortfall`) and suggests a later date or a smaller target.
+- **Debt: no target payoff date** (owner's choice). Each debt gets a payment goal for this month: its minimum plus its share
+  of the planned extra (by payoff method), worked out from the balances when the month began, so it stays put while
+  payments are logged ("chipped away"). Logging a payment lowers the balance. Each debt shows its own payoff timeframe.
+- **This month's budget uses start-of-month debt balances**, so paying a debt down or off mid-month doesn't change this
+  month's Left Over; the planned extra payment stays until the month ends.
+- Not done, to keep things simple: catch-up for debt (would need a target payoff date) and fun-money rollover (would need
+  logging every purchase).
+
 ## Interaction details
 - **Toasts:** 7 s when they offer Undo, 5 s otherwise; up to 3 stack; the timer pauses while a toast is touched or focused.
   An Undo that would replace the whole budget (Smart Plan, example data, restore) closes as soon as anything else
