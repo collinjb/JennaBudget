@@ -19,6 +19,7 @@ import {
   type Account,
   type AccountType,
   type CreditScore,
+  type SpendEntry,
 } from '../types';
 
 // Persistence contract. Implemented by the iPhone & PWA agent.
@@ -35,6 +36,8 @@ export const BACKUP_VERSION = 1;
 export const MAX_NAME_LENGTH = 60;
 /** Most items accepted in one list (protects the app from absurd or hostile files). */
 export const MAX_ITEMS_PER_LIST = 1000;
+/** The spending log can hold more: about 13 months of everyday purchases. */
+export const MAX_SPEND_ENTRIES = 5000;
 /** Largest backup file accepted, in characters. */
 const MAX_BACKUP_CHARS = 5_000_000;
 
@@ -232,7 +235,7 @@ function isObj(v: unknown): v is Obj {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-const COLLECTIONS = ['incomes', 'bills', 'debts', 'spending', 'goals', 'accounts', 'creditScores'] as const;
+const COLLECTIONS = ['incomes', 'bills', 'debts', 'spending', 'goals', 'accounts', 'creditScores', 'spendLog'] as const;
 type Collection = (typeof COLLECTIONS)[number];
 
 /** Defaults for item fields that older or partial data may not have. Required fields have no default. */
@@ -240,10 +243,11 @@ const ITEM_DEFAULTS: Record<Collection, Obj> = {
   incomes: { semimonthlyDays: [1, 15] },
   bills: { emoji: '🧾', paidMonth: null },
   debts: { type: 'other', monthPaid: null },
-  spending: { emoji: '💵', kind: 'need' },
+  spending: { emoji: '💵', kind: 'need', period: 'month' },
   goals: { emoji: '🎯', saved: 0, monthly: 0, targetDate: null, isEmergencyFund: false, monthDeposit: null },
   accounts: { type: 'other' },
   creditScores: {},
+  spendLog: { note: '' },
 };
 
 function migrateInternal(raw: unknown): { value: unknown; changed: boolean } {
@@ -318,6 +322,7 @@ const DEBT_TYPES: readonly DebtType[] = ['student', 'credit', 'car', 'personal',
 const SPENDING_KINDS: readonly SpendingCategory['kind'][] = ['need', 'fun'];
 const PAYOFF_METHODS: readonly PayoffMethod[] = ['avalanche', 'snowball'];
 const THEMES: readonly ThemeSetting[] = ['system', 'light', 'dark'];
+const SPENDING_PERIODS: readonly SpendingCategory['period'][] = ['month', 'week'];
 const ACCOUNT_TYPES: readonly AccountType[] = ['savings', 'checking', 'roth', 'retirement', 'investment', 'other'];
 
 const MIN_YEAR = 1900;
@@ -426,6 +431,20 @@ class Reader {
     return { month: month as string, amount: amount as number };
   }
 
+  /** The id of another item (e.g. a spending entry's category). */
+  ref(key: string): string {
+    const v = this.has(key);
+    if (typeof v !== 'string' || v.trim() === '' || v.length > 200) this.fail(`the ${label(key)} isn't valid.`);
+    return v;
+  }
+
+  /** Short free text, trimmed and cut to 80 characters. */
+  note(key: string): string {
+    const v = this.has(key);
+    if (typeof v !== 'string') this.fail(`the ${label(key)} isn't text.`);
+    return cutText(v.trim(), 80);
+  }
+
   creditScore(key: string): number {
     const v = this.has(key);
     if (typeof v !== 'number' || !Number.isInteger(v) || v < 300 || v > 850) {
@@ -497,6 +516,9 @@ const FIELD_LABELS: Record<string, string> = {
   updatedAt: 'last-updated date',
   score: 'credit score',
   date: 'date',
+  categoryId: 'category',
+  note: 'note',
+  period: 'week-or-month choice',
   payoffMethod: 'payoff method',
   extraDebtPayment: 'extra debt payment',
   theme: 'theme',
@@ -523,13 +545,15 @@ const LIST_LABELS: Record<Collection, { one: string; many: string }> = {
   goals: { one: 'Savings goal', many: 'savings goals' },
   accounts: { one: 'Account', many: 'accounts' },
   creditScores: { one: 'Credit score', many: 'credit scores' },
+  spendLog: { one: 'Spending entry', many: 'spending entries' },
 };
 
 function readList<T>(root: Obj, c: Collection, readItem: (r: Reader) => T): T[] {
   const list = root[c];
   const { one, many } = LIST_LABELS[c];
   if (!Array.isArray(list)) throw new InvalidData(`The list of ${many} is missing or damaged.`);
-  if (list.length > MAX_ITEMS_PER_LIST) throw new InvalidData(`There are too many ${many} (the most is ${MAX_ITEMS_PER_LIST}).`);
+  const most = c === 'spendLog' ? MAX_SPEND_ENTRIES : MAX_ITEMS_PER_LIST;
+  if (list.length > most) throw new InvalidData(`There are too many ${many} (the most is ${most}).`);
   const seen = new Set<string>();
   return list.map((item: unknown, i) => {
     const n = i + 1;
@@ -586,6 +610,17 @@ function readSpending(r: Reader): SpendingCategory {
     emoji: r.emoji(),
     monthly: r.money('monthly'),
     kind: r.oneOf('kind', SPENDING_KINDS),
+    period: r.oneOf('period', SPENDING_PERIODS),
+  };
+}
+
+function readSpendEntry(r: Reader): SpendEntry {
+  return {
+    id: r.id(),
+    categoryId: r.ref('categoryId'),
+    amount: r.money('amount'),
+    date: r.date('date'),
+    note: r.note('note'),
   };
 }
 
@@ -667,6 +702,7 @@ export function validateBudget(raw: unknown): { ok: true; data: BudgetData } | {
       goals,
       accounts: readList(raw, 'accounts', readAccount),
       creditScores: readList(raw, 'creditScores', readCreditScore),
+      spendLog: readList(raw, 'spendLog', readSpendEntry),
       settings: readSettings(raw),
     };
     return { ok: true, data };
@@ -687,6 +723,7 @@ export interface BackupSummary {
   goals: number;
   accounts: number;
   creditScores: number;
+  spendLog: number;
   /** ISO timestamp from the file, or null if absent. */
   exportedAt: string | null;
 }
@@ -766,6 +803,7 @@ export function parseBackup(
       goals: d.goals.length,
       accounts: d.accounts.length,
       creditScores: d.creditScores.length,
+      spendLog: d.spendLog.length,
       exportedAt,
     },
   };

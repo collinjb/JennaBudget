@@ -400,7 +400,7 @@ export function buildSmartPlan(data: BudgetData, today: ISODate): SmartPlan {
       });
     });
   } else if (fun > 0) {
-    newSpending = { id: newId(), name: NEW_FUN_MONEY.name, emoji: NEW_FUN_MONEY.emoji, monthly: fun, kind: 'fun' };
+    newSpending = { id: newId(), name: NEW_FUN_MONEY.name, emoji: NEW_FUN_MONEY.emoji, monthly: fun, kind: 'fun', period: 'month' };
     lines.push({
       kind: 'newSpending',
       id: null,

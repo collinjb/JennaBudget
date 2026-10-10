@@ -136,8 +136,8 @@ function sample(): BudgetData {
       { id: 'debt-2', name: 'Student Loan', type: 'student', balance: 1_200_000, rateBps: 0, minPayment: 0, dueDay: 31, monthPaid: null },
     ],
     spending: [
-      { id: 'sp-1', name: 'Groceries', emoji: '🛒', monthly: 40_000, kind: 'need' },
-      { id: 'sp-2', name: 'Fun Money', emoji: '🎉', monthly: 10_000, kind: 'fun' },
+      { id: 'sp-1', name: 'Groceries', emoji: '🛒', monthly: 40_000, kind: 'need', period: 'month' },
+      { id: 'sp-2', name: 'Fun Money', emoji: '🎉', monthly: 10_000, kind: 'fun', period: 'month' },
     ],
     goals: [
       {
@@ -165,6 +165,7 @@ function sample(): BudgetData {
     ],
     accounts: [],
     creditScores: [],
+    spendLog: [],
     settings: {
       payoffMethod: 'snowball',
       extraDebtPayment: 5_000,

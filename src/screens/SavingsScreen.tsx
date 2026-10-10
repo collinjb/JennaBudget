@@ -258,6 +258,7 @@ export function SpendingSheet({ item, onClose }: { item: SpendingCategory | null
       emoji,
       monthly: cents,
       kind,
+      period: item?.period ?? 'month',
     });
     return true;
   };

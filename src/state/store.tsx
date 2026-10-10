@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { monthKey, todayISO } from '../lib/dates';
 import { startOfMonthBalance } from '../lib/debt';
+import { pruneSpendLog } from '../lib/spending';
 import { MAX_MONEY_CENTS } from '../lib/money';
 import { clearData, loadData, saveData, validateBudget } from '../storage/storage';
 import {
@@ -78,7 +79,7 @@ interface InitialState {
 function initialState(): InitialState {
   const result = loadData();
   const fine = { corruptRaw: null, corruptError: null, corruptReason: null };
-  if (result.status === 'ok') return { data: withoutStaleExtra(result.data), status: 'ready', ...fine };
+  if (result.status === 'ok') return { data: tidy(result.data), status: 'ready', ...fine };
   if (result.status === 'corrupt') {
     return {
       data: emptyBudget(),
@@ -94,6 +95,13 @@ function initialState(): InitialState {
 /** Once every debt is paid off, a planned extra payment no longer means anything; drop it so it can't come back
  * silently (and quietly lower Left Over) when a new debt is added later. A debt paid off during this month still
  * counts until the month ends (this month's budget already planned for it). */
+/** Housekeeping on every save: drop a stale extra payment and purchases older than about 13 months. */
+function tidy(d: BudgetData, today: string = todayISO()): BudgetData {
+  const cleaned = withoutStaleExtra(d, monthKey(today));
+  const spendLog = pruneSpendLog(cleaned.spendLog, today);
+  return spendLog === cleaned.spendLog ? cleaned : { ...cleaned, spendLog };
+}
+
 function withoutStaleExtra(d: BudgetData, month: MonthKey = monthKey(todayISO())): BudgetData {
   if (d.settings.extraDebtPayment > 0 && !d.debts.some((x) => startOfMonthBalance(x, month) > 0)) {
     return { ...d, settings: { ...d.settings, extraDebtPayment: 0 } };
@@ -130,7 +138,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       setSaveError(`That change couldn't be made because something in it isn't right. ${v.error}`);
       return;
     }
-    const clean = withoutStaleExtra(v.data);
+    const clean = tidy(v.data);
     dataRef.current = clean;
     setData(clean);
     if (statusRef.current !== 'ready') return;

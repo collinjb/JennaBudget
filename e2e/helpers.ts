@@ -126,7 +126,7 @@ export function debt(over: Partial<Debt> = {}): Debt {
 }
 
 export function spending(over: Partial<SpendingCategory> = {}): SpendingCategory {
-  return { id: nextId('sp'), name: 'Groceries', emoji: '🛒', monthly: 30_000, kind: 'need', ...over };
+  return { id: nextId('sp'), name: 'Groceries', emoji: '🛒', monthly: 30_000, kind: 'need', period: 'month', ...over };
 }
 
 export function goal(over: Partial<Goal> = {}): Goal {
@@ -157,6 +157,7 @@ export function budget(
     goals: parts.goals ?? [],
     accounts: parts.accounts ?? [],
     creditScores: parts.creditScores ?? [],
+    spendLog: parts.spendLog ?? [],
     settings: {
       payoffMethod: 'avalanche',
       extraDebtPayment: 0,

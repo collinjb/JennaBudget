@@ -1,4 +1,4 @@
-import type { Account, Bill, BudgetData, CreditScore, Debt, Goal, ISODate, Income, SpendingCategory } from '../types';
+import type { Account, Bill, BudgetData, CreditScore, Debt, Goal, ISODate, Income, SpendEntry, SpendingCategory } from '../types';
 import { DEFAULT_SETTINGS, SCHEMA_VERSION } from '../types';
 import { addDays, addMonthsToKey, dateInMonth, dayOfWeek, isoParts, monthKey } from './dates';
 import { newId } from './ids';
@@ -77,11 +77,21 @@ export function makeExampleBudget(today: ISODate): BudgetData {
     { id: newId(), name: 'Car Loan', type: 'car', balance: 820_000, rateBps: 590, minPayment: 24_500, dueDay: 5, monthPaid: null },
   ];
 
+  const groceries: SpendingCategory = { id: newId(), name: 'Groceries', emoji: '🛒', monthly: 35_000, kind: 'need', period: 'month' };
+  // Fun money tracked by the week: $25 a week (= $108.33 a month).
+  const fun: SpendingCategory = { id: newId(), name: 'Fun Money', emoji: '🎉', monthly: 10_833, kind: 'fun', period: 'week' };
   const spending: SpendingCategory[] = [
-    { id: newId(), name: 'Groceries', emoji: '🛒', monthly: 35_000, kind: 'need' },
-    { id: newId(), name: 'Gas', emoji: '⛽', monthly: 14_000, kind: 'need' },
-    { id: newId(), name: 'Fun Money', emoji: '🎉', monthly: 10_000, kind: 'fun' },
-    { id: newId(), name: 'Eating Out', emoji: '🍔', monthly: 5_000, kind: 'fun' },
+    groceries,
+    { id: newId(), name: 'Gas', emoji: '⛽', monthly: 14_000, kind: 'need', period: 'month' },
+    fun,
+    { id: newId(), name: 'Eating Out', emoji: '🍔', monthly: 5_000, kind: 'fun', period: 'month' },
+  ];
+  // A few purchases this week and month, so "left this week" has something to show.
+  const thisWeek = addDays(today, -((dayOfWeek(today) + 7) % 7));
+  const spendLog: SpendEntry[] = [
+    { id: newId(), categoryId: fun.id, amount: 1_200, date: thisWeek, note: 'Movies' },
+    { id: newId(), categoryId: fun.id, amount: 450, date: today, note: 'Coffee' },
+    { id: newId(), categoryId: groceries.id, amount: 8_640, date: inMonth(0, 1), note: '' },
   ];
 
   const goals: Goal[] = [
@@ -133,6 +143,7 @@ export function makeExampleBudget(today: ISODate): BudgetData {
     goals,
     accounts,
     creditScores,
+    spendLog,
     settings: { ...DEFAULT_SETTINGS, payoffMethod: 'avalanche', extraDebtPayment: 2_500, onboarded: true, isExample: true },
   };
 }

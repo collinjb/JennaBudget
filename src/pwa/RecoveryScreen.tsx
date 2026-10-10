@@ -40,6 +40,7 @@ function countsOf(d: BudgetData): Omit<BackupSummary, 'exportedAt'> {
     goals: d.goals.length,
     accounts: d.accounts.length,
     creditScores: d.creditScores.length,
+    spendLog: d.spendLog.length,
   };
 }
 

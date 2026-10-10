@@ -73,9 +73,22 @@ export interface SpendingCategory {
   id: string;
   name: string;
   emoji: string;
+  /** The monthly budget (what the whole app plans with). For a weekly category this is weekly × 52 ÷ 12. */
   monthly: Cents;
   /** 'need' = must-have (Smart Plan never changes it). 'fun' = nice-to-have (Smart Plan may adjust it). */
   kind: 'need' | 'fun';
+  /** How spending is tracked: a fresh budget every week (Sun–Sat) or every month. */
+  period: 'month' | 'week';
+}
+
+/** One logged purchase, taken out of a spending category's budget for its week or month. */
+export interface SpendEntry {
+  id: string;
+  categoryId: string;
+  amount: Cents;
+  date: ISODate;
+  /** Optional, e.g. "Movies". */
+  note: string;
 }
 
 export interface Goal {
@@ -148,11 +161,21 @@ export interface BudgetData {
   accounts: Account[];
   /** Credit score checks, any order (sorted by date when shown). */
   creditScores: CreditScore[];
+  /** Logged purchases against spending categories (old entries are trimmed after about 13 months). */
+  spendLog: SpendEntry[];
   settings: Settings;
 }
 
 /** The list-shaped collections in BudgetData. */
-export type CollectionName = 'incomes' | 'bills' | 'debts' | 'spending' | 'goals' | 'accounts' | 'creditScores';
+export type CollectionName =
+  | 'incomes'
+  | 'bills'
+  | 'debts'
+  | 'spending'
+  | 'goals'
+  | 'accounts'
+  | 'creditScores'
+  | 'spendLog';
 export type CollectionItem<K extends CollectionName> = BudgetData[K][number];
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -174,6 +197,7 @@ export function emptyBudget(): BudgetData {
     goals: [],
     accounts: [],
     creditScores: [],
+    spendLog: [],
     settings: { ...DEFAULT_SETTINGS },
   };
 }
