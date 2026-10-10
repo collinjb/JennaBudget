@@ -91,7 +91,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   return (
     <main className="lock" aria-labelledby="lock-title">
       <div className="lock__top">
-        <img className="lock__logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={72} height={72} />
+        <img className="lock__logo" src={`${import.meta.env.BASE_URL}pwa-512x512.png`} alt="" width={72} height={72} />
         <h1 className="lock__title" id="lock-title" ref={titleRef} tabIndex={-1}>
           Enter your code
         </h1>

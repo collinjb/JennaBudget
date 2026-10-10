@@ -112,7 +112,7 @@
 }
 
 .card--info {
-  background: var(--c-bills-soft);
+  background: var(--accent-soft);
   box-shadow: none;
 }
 
@@ -454,12 +454,12 @@
 }
 
 :root[data-theme='dark'] .seg__thumb {
-  background: #636366;
+  background: #5a3447;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .seg__thumb {
-    background: #636366;
+    background: #5a3447;
   }
 }
 
@@ -787,7 +787,7 @@
 
 .chip--on {
   border-color: var(--link);
-  background: var(--c-bills-soft);
+  background: var(--accent-soft);
   color: var(--link);
 }
 
@@ -1225,12 +1225,12 @@ button.row {
 }
 
 .notice--info {
-  background: var(--c-bills-soft);
+  background: var(--accent-soft);
   color: var(--text);
 }
 
 .notice--info svg {
-  color: var(--c-bills-ink);
+  color: var(--accent-ink);
 }
 
 .notice--good {
@@ -1553,12 +1553,12 @@ button.row {
 }
 
 :root[data-theme='dark'] .dialog {
-  background: #2c2c2e;
+  background: #321b27;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .dialog {
-    background: #2c2c2e;
+    background: #321b27;
   }
 }
 
@@ -1655,14 +1655,14 @@ body:has(.tabbar) .toast-region {
   min-height: 52px;
   padding: 6px 6px 6px 16px;
   border-radius: 16px;
-  background: #1c1c1e;
+  background: #3a1a2b;
   color: #fff;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 30px rgba(80, 10, 45, 0.3);
   animation: toast-in 300ms var(--ease-out) both;
 }
 
 :root[data-theme='dark'] .toast {
-  background: #2c2c2e;
+  background: #43213a;
   box-shadow:
     0 8px 30px rgba(0, 0, 0, 0.6),
     inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
@@ -1670,19 +1670,19 @@ body:has(.tabbar) .toast-region {
 
 :root[data-theme='dark'] .toast__action {
   background: rgba(255, 255, 255, 0.12);
-  color: #b3cfff;
+  color: #ffb3d1;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .toast {
-    background: #2c2c2e;
+    background: #43213a;
     box-shadow:
       0 8px 30px rgba(0, 0, 0, 0.6),
       inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
   }
   :root:not([data-theme='light']) .toast__action {
     background: rgba(255, 255, 255, 0.12);
-    color: #b3cfff;
+    color: #ffb3d1;
   }
 }
 
@@ -1711,7 +1711,7 @@ body:has(.tabbar) .toast-region {
   border: 0;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.14);
-  color: #9cc0ff;
+  color: #ffb3d1;
   font-weight: 700;
   font-size: var(--fs-callout);
 }
@@ -1979,7 +1979,7 @@ body:has(.tabbar) .toast-region {
   gap: 12px;
   padding: 14px 16px 16px;
   border-radius: var(--radius);
-  background: var(--c-bills-soft);
+  background: var(--accent-soft);
 }
 
 .banner__row {
@@ -1991,7 +1991,7 @@ body:has(.tabbar) .toast-region {
 .banner__icon {
   flex: 0 0 auto;
   margin-top: 1px;
-  color: var(--c-bills-ink);
+  color: var(--accent-ink);
 }
 
 .banner__text {

@@ -1,10 +1,11 @@
 /*
  * Design tokens shared by every part of the app. The Design & UI agent owns and may refine this file;
  * the iPhone & PWA agent's screens (update banner, recovery screen) use these variables too.
- * Theme: follows the iPhone by default; <html data-theme="light|dark"> forces one.
+ * Theme: pink. Soft blush in light mode, deep plum with bright pink in dark mode.
+ * Follows the iPhone by default; <html data-theme="light|dark"> forces one.
  *
  * Meaning colors (used consistently everywhere, always paired with text or an icon):
- *   Bills = blue · Debt = orange · Savings = green · Spending & Fun = purple · Left over = teal · Over = red
+ *   Bills = blue · Debt = orange · Savings = green · Spending & Fun = purple · Left over = pink · Over = red
  * Each has a "fill" (bars, dots, rings) and an "-ink" variant (text on cards; WCAG AA on --surface and --bg).
  */
 :root {
@@ -14,23 +15,23 @@
     'Segoe UI', Roboto, sans-serif;
 
   /* Surfaces */
-  --bg: #f2f2f7;
+  --bg: #fff5f8;
   --surface: #ffffff;
-  --surface-2: #f2f2f7;
-  --field: #f2f2f7;
+  --surface-2: #fdeef3;
+  --field: #fdeef3;
   /* Outline of fields and switches: 3:1 against both the card and the field fill (WCAG 1.4.11). */
-  --field-border: #8a8a8e;
-  --fill: rgba(118, 118, 128, 0.12);
-  --fill-strong: rgba(118, 118, 128, 0.2);
-  --text: #1c1c1e;
-  --text-2: #636366;
-  --border: #e5e5ea;
-  --separator: rgba(60, 60, 67, 0.16);
+  --field-border: #a3798b;
+  --fill: rgba(214, 51, 108, 0.1);
+  --fill-strong: rgba(214, 51, 108, 0.18);
+  --text: #2b1620;
+  --text-2: #7a5566;
+  --border: #f5d5e1;
+  --separator: rgba(122, 60, 90, 0.16);
   --backdrop: rgba(0, 0, 0, 0.32);
-  --material: rgba(249, 249, 251, 0.97);
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 20px rgba(16, 24, 40, 0.06);
+  --material: rgba(255, 245, 248, 0.97);
+  --shadow: 0 1px 2px rgba(120, 30, 70, 0.05), 0 6px 20px rgba(120, 30, 70, 0.08);
   --shadow-lg: 0 10px 40px rgba(16, 24, 40, 0.18);
-  --focus: #2563eb;
+  --focus: #d6336c;
 
   /* Meaning colors: fills */
   --c-bills: #2f6fed;
@@ -38,31 +39,34 @@
   --c-debt: #d9661c;
   --c-savings: #1e9450;
   --c-fun: #8b5cf6;
-  --c-left: #14a39a;
+  --c-left: #e64980;
   --c-over: #e5484d;
   --c-warn: #d97706;
   /* "On" switches: a deeper green so the white thumb and the track both stand out. */
-  --toggle-on: #1a8a47;
+  --toggle-on: #c2255c;
   /* Meaning colors: text ("ink") */
   --c-bills-ink: #1f5bd6;
   --c-debt-ink: #b54708;
   --c-savings-ink: #157a40;
   --c-fun-ink: #6d3fe0;
-  --c-left-ink: #0a746c;
+  --c-left-ink: #b5245a;
   --c-over-ink: #c9252b;
   --c-warn-ink: #9a5507;
   /* Soft tints for badges / warning panels */
   --c-over-soft: #fdecec;
   --c-warn-soft: #fff4e0;
   --c-savings-soft: #e7f6ed;
-  --c-left-soft: #e3f5f3;
+  --c-left-soft: #ffe3ee;
   --c-bills-soft: #e8effd;
+  /* Pink tint for UI chrome (info cards, secondary buttons, selected chips); not a meaning color. */
+  --accent-soft: #ffe3ee;
+  --accent-ink: #b5245a;
 
   /* Actions */
-  --primary: #2563eb;
-  --primary-pressed: #1d4fc4;
+  --primary: #d6336c;
+  --primary-pressed: #b5245a;
   --on-primary: #ffffff;
-  --link: #1f63e0;
+  --link: #c2255c;
   --danger: #c9252b;
 
   /* Shape & spacing */
@@ -107,91 +111,97 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bg: #000000;
-    --surface: #1c1c1e;
-    --surface-2: #2c2c2e;
-    --field: #2c2c2e;
-    --field-border: #7c7c80;
-    --fill: rgba(118, 118, 128, 0.24);
-    --fill-strong: rgba(118, 118, 128, 0.36);
-    --text: #f5f5f7;
-    --text-2: #a1a1a8;
-    --border: #38383a;
-    --separator: rgba(84, 84, 88, 0.6);
-    --backdrop: rgba(0, 0, 0, 0.55);
-    --material: rgba(22, 22, 24, 0.97);
+    --bg: #150a10;
+    --surface: #24131c;
+    --surface-2: #321b27;
+    --field: #321b27;
+    --field-border: #8f6b7d;
+    --fill: rgba(255, 140, 190, 0.14);
+    --fill-strong: rgba(255, 140, 190, 0.24);
+    --text: #fff0f6;
+    --text-2: #c9a9b8;
+    --border: #3d2230;
+    --separator: rgba(255, 170, 205, 0.14);
+    --backdrop: rgba(10, 2, 6, 0.6);
+    --material: rgba(30, 15, 23, 0.97);
     --shadow: none;
     --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.6);
-    --focus: #6ea0ff;
+    --focus: #ff8fbd;
     --c-bills: #5b8cff;
     --c-debt: #ff8a4c;
     --c-savings: #34c77b;
     --c-fun: #a98bff;
-    --c-left: #2dd4bf;
+    --c-left: #ff7ab3;
     --c-over: #ff6369;
     --c-warn: #fbbf24;
-    --toggle-on: #30b56f;
+    --toggle-on: #e64980;
     --c-bills-ink: #82a8ff;
     --c-debt-ink: #ffa270;
     --c-savings-ink: #4cd98e;
     --c-fun-ink: #bba3ff;
-    --c-left-ink: #2dd4bf;
+    --c-left-ink: #ff9cc6;
     --c-over-ink: #ff7b80;
     --c-warn-ink: #fbbf24;
     --c-over-soft: rgba(255, 99, 105, 0.14);
     --c-warn-soft: rgba(251, 191, 36, 0.13);
     --c-savings-soft: rgba(52, 199, 123, 0.14);
-    --c-left-soft: rgba(45, 212, 191, 0.13);
+    --c-left-soft: rgba(255, 122, 179, 0.14);
     --c-bills-soft: rgba(91, 140, 255, 0.16);
-    --primary: #2563eb;
-    --primary-pressed: #1d4fc4;
+    /* Pink tint for UI chrome (info cards, secondary buttons, selected chips); not a meaning color. */
+    --accent-soft: rgba(255, 122, 179, 0.14);
+    --accent-ink: #ff9cc6;
+    --primary: #d6336c;
+    --primary-pressed: #b5245a;
     --on-primary: #ffffff;
-    --link: #6ea0ff;
+    --link: #ff8fbd;
     --danger: #ff7b80;
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #000000;
-  --surface: #1c1c1e;
-  --surface-2: #2c2c2e;
-  --field: #2c2c2e;
-  --field-border: #7c7c80;
-  --fill: rgba(118, 118, 128, 0.24);
-  --fill-strong: rgba(118, 118, 128, 0.36);
-  --text: #f5f5f7;
-  --text-2: #a1a1a8;
-  --border: #38383a;
-  --separator: rgba(84, 84, 88, 0.6);
-  --backdrop: rgba(0, 0, 0, 0.55);
-  --material: rgba(22, 22, 24, 0.97);
+  --bg: #150a10;
+  --surface: #24131c;
+  --surface-2: #321b27;
+  --field: #321b27;
+  --field-border: #8f6b7d;
+  --fill: rgba(255, 140, 190, 0.14);
+  --fill-strong: rgba(255, 140, 190, 0.24);
+  --text: #fff0f6;
+  --text-2: #c9a9b8;
+  --border: #3d2230;
+  --separator: rgba(255, 170, 205, 0.14);
+  --backdrop: rgba(10, 2, 6, 0.6);
+  --material: rgba(30, 15, 23, 0.97);
   --shadow: none;
   --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.6);
-  --focus: #6ea0ff;
+  --focus: #ff8fbd;
   --c-bills: #5b8cff;
   --c-debt: #ff8a4c;
   --c-savings: #34c77b;
   --c-fun: #a98bff;
-  --c-left: #2dd4bf;
+  --c-left: #ff7ab3;
   --c-over: #ff6369;
   --c-warn: #fbbf24;
-  --toggle-on: #30b56f;
+  --toggle-on: #e64980;
   --c-bills-ink: #82a8ff;
   --c-debt-ink: #ffa270;
   --c-savings-ink: #4cd98e;
   --c-fun-ink: #bba3ff;
-  --c-left-ink: #2dd4bf;
+  --c-left-ink: #ff9cc6;
   --c-over-ink: #ff7b80;
   --c-warn-ink: #fbbf24;
   --c-over-soft: rgba(255, 99, 105, 0.14);
   --c-warn-soft: rgba(251, 191, 36, 0.13);
   --c-savings-soft: rgba(52, 199, 123, 0.14);
-  --c-left-soft: rgba(45, 212, 191, 0.13);
+  --c-left-soft: rgba(255, 122, 179, 0.14);
   --c-bills-soft: rgba(91, 140, 255, 0.16);
-  --primary: #2563eb;
-  --primary-pressed: #1d4fc4;
+  /* Pink tint for UI chrome (info cards, secondary buttons, selected chips); not a meaning color. */
+  --accent-soft: rgba(255, 122, 179, 0.14);
+  --accent-ink: #ff9cc6;
+  --primary: #d6336c;
+  --primary-pressed: #b5245a;
   --on-primary: #ffffff;
-  --link: #6ea0ff;
+  --link: #ff8fbd;
   --danger: #ff7b80;
 }

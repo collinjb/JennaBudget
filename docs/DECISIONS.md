@@ -73,6 +73,16 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
 - **Saving:** the app keeps exactly what was saved (tidied and validated) and refuses a change that couldn't be saved,
   showing a message, instead of keeping it in memory where every later save would fail.
 
+## Look (owner's request)
+- **Pink theme.** Light mode: blush background (#fff5f8), white cards, raspberry-pink buttons and links. Dark mode: deep
+  plum (#150a10) with bright pink accents. Left over is pink. Every text/background pair was checked for WCAG AA.
+- **Meaning colors stay** (bills blue, debt orange, savings green, spending & fun purple, over budget red), so they don't
+  blur together; neutral highlights (info cards, secondary buttons, selected chips) use the pink `--accent-soft` tint.
+- **App icon:** the owner's own artwork, a glossy pink piggy bank with a gold coin dropping in
+  (`scripts/icon-source.webp`, 2000×2000). `npm run icons` builds every size and the launch screens from it; the pig
+  already sits inside the maskable safe zone, so it's used full-bleed. The drawn `scripts/icon.svg` is only a fallback
+  when no `icon-source.*` file exists.
+
 ## Money & dates
 - Money is integer cents everywhere; interest rates are integer basis points (6.8% = 680).
 - Dates are local `YYYY-MM-DD` strings; helpers in `src/lib/dates.ts` avoid the UTC-parsing off-by-one-day bug.

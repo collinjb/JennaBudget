@@ -1,4 +1,5 @@
-// Generates every app icon (and the iPhone launch screens) from scripts/icon.svg.
+// Generates every app icon (and the iPhone launch screens) from scripts/icon-source.webp/.png/.jpg when present
+// (a finished square artwork, e.g. from an image generator), otherwise from the drawn scripts/icon.svg.
 // Run with: npm run icons
 //
 // Outputs in public/:
@@ -12,7 +13,7 @@
 // It also rewrites the <link rel="apple-touch-startup-image"> block in index.html between the
 // "splash-screens:start/end" markers, so the files and the tags can never drift apart.
 
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -23,10 +24,10 @@ const splashDir = path.join(publicDir, 'splash');
 const indexHtmlPath = path.join(root, 'index.html');
 
 /** App background colors. MUST match --bg in src/styles/tokens.css (light and dark). */
-const LIGHT_BG = '#f2f2f7';
-const DARK_BG = '#000000';
+const LIGHT_BG = '#fff5f8';
+const DARK_BG = '#150a10';
 /** Solid color used to flatten the apple-touch-icon (only matters if the SVG ever gains transparency). */
-const ICON_FLATTEN_BG = '#2ea8e0';
+const ICON_FLATTEN_BG = '#ffb3cf';
 /** Maskable icons: everything important must sit inside a centered circle of 80% diameter. */
 const MASKABLE_ART_SCALE = 0.82;
 /** Corner radius for the rounded variants (iOS-like, ~22.4% of the size). */
@@ -53,6 +54,21 @@ const IPHONE_SCREENS = [
 
 // ---------------------------------------------------------------------------------------------
 // SVG variants
+
+/** A finished square artwork (full-bleed background, subject inside the middle ~80%) wins over the drawn SVG. */
+async function findRasterSource() {
+  for (const name of ['icon-source.webp', 'icon-source.png', 'icon-source.jpg']) {
+    const file = path.join(root, 'scripts', name);
+    try {
+      await access(file);
+      return file;
+    } catch {
+      /* not there */
+    }
+  }
+  return null;
+}
+const rasterSource = await findRasterSource();
 
 // Comments are stripped first so the documentation inside icon.svg can't confuse the hooks below.
 const masterSvg = (await readFile(path.join(root, 'scripts', 'icon.svg'), 'utf8')).replace(/<!--[\s\S]*?-->/g, '');
@@ -101,6 +117,28 @@ async function renderPng(svg, size) {
   return sharp(big).resize(size, size, { kernel: 'lanczos3' }).png().toBuffer();
 }
 
+/** iOS-like rounded-square mask at `size`. */
+function roundedMask(size) {
+  const r = Math.round((ROUNDED_RADIUS / 1024) * size);
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" ry="${r}"/></svg>`);
+}
+
+/**
+ * One icon variant as a PNG buffer: 'full' (square, full-bleed), 'rounded' (rounded corners, transparent outside),
+ * 'maskable' (full-bleed, artwork inside the safe zone). A raster source is used as-is for 'full' and 'maskable'
+ * (its subject already sits inside the middle 80%), and clipped for 'rounded'.
+ */
+async function renderVariant(kind, size) {
+  if (!rasterSource) return renderPng(variants[kind], size);
+  const square = await sharp(rasterSource).resize(size, size, { kernel: 'lanczos3', fit: 'cover' }).png().toBuffer();
+  if (kind !== 'rounded') return square;
+  return sharp(square)
+    .ensureAlpha()
+    .composite([{ input: roundedMask(size), blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+}
+
 // ---------------------------------------------------------------------------------------------
 // Icons
 
@@ -117,7 +155,7 @@ async function writePng(name, buffer) {
 // apple-touch-icon: full-bleed square, flattened so there is NO alpha channel at all.
 await writePng(
   'apple-touch-icon.png',
-  await sharp(await renderPng(variants.full, 180))
+  await sharp(await renderVariant('full', 180))
     .flatten({ background: ICON_FLATTEN_BG })
     .removeAlpha()
     .png({ compressionLevel: 9 })
@@ -127,13 +165,13 @@ await writePng(
 for (const size of [192, 512]) {
   await writePng(
     `pwa-${size}x${size}.png`,
-    await sharp(await renderPng(variants.rounded, size)).png({ compressionLevel: 9 }).toBuffer(),
+    await sharp(await renderVariant('rounded', size)).png({ compressionLevel: 9 }).toBuffer(),
   );
 }
 
 await writePng(
   'maskable-512x512.png',
-  await sharp(await renderPng(variants.maskable, 512))
+  await sharp(await renderVariant('maskable', 512))
     .flatten({ background: ICON_FLATTEN_BG })
     .removeAlpha()
     .png({ compressionLevel: 9 })
@@ -142,10 +180,17 @@ await writePng(
 
 await writePng(
   'favicon-32x32.png',
-  await sharp(await renderPng(variants.rounded, 32)).png({ compressionLevel: 9 }).toBuffer(),
+  await sharp(await renderVariant('rounded', 32)).png({ compressionLevel: 9 }).toBuffer(),
 );
 
-await writeFile(path.join(publicDir, 'favicon.svg'), minifySvg(variants.rounded));
+// favicon.svg: the drawn SVG, or (for a raster source) a small rounded PNG wrapped in an SVG.
+const faviconSvg = rasterSource
+  ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><image width="128" height="128" href="data:image/png;base64,${(
+      await sharp(await renderVariant('rounded', 128)).png({ compressionLevel: 9, palette: true }).toBuffer()
+    ).toString('base64')}"/></svg>
+`
+  : minifySvg(variants.rounded);
+await writeFile(path.join(publicDir, 'favicon.svg'), faviconSvg);
 outputs.push(path.join(publicDir, 'favicon.svg'));
 
 // ---------------------------------------------------------------------------------------------
@@ -155,7 +200,7 @@ await rm(splashDir, { recursive: true, force: true });
 await mkdir(splashDir, { recursive: true });
 
 const splashLinks = [];
-const iconMaster = await sharp(Buffer.from(variants.rounded), { density: 144 }).resize(1024, 1024).png().toBuffer();
+const iconMaster = await renderVariant('rounded', 1024);
 
 for (const s of IPHONE_SCREENS) {
   const width = s.w * s.dpr;

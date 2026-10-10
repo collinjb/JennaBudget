@@ -1,8 +1,17 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '../components/Card';
 import { StackedBar, type Tone } from '../components/Charts';
 import { useConfirm } from '../components/ConfirmDialog';
-import { IconArrowRight, IconCheck, IconChevronRight, IconGear, IconInfo, IconSparkle, IconWarning } from '../components/Icons';
+import {
+  IconArrowRight,
+  IconCheck,
+  IconChevronRight,
+  IconGear,
+  IconInfo,
+  IconPlus,
+  IconSparkle,
+  IconWarning,
+} from '../components/Icons';
 import { Money } from '../components/Money';
 import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
@@ -13,14 +22,17 @@ import { ceilDollars, formatMoney } from '../lib/money';
 import { netWorth, scoreSummary } from '../lib/networth';
 import { paycheckPlan, type PaycheckWindow } from '../lib/schedule';
 import { buildSmartPlan } from '../lib/smartPlan';
+import { categorySpend } from '../lib/spending';
 import { homeBreakdown, monthlySummary, type BreakdownKey } from '../lib/summary';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import { DEFAULT_SETTINGS, emptyBudget } from '../types';
 import { GoalMonthLine, GoalStatusLine } from './goalStatus';
+import { LogSpendingSheet } from './LogSpendingSheet';
 import { useNav } from './nav';
 import { BandBadge, signedMoney } from './netWorthParts';
 import { GOALS_SHORT_TITLE, GoalsShortText, InterestWarningNotice, ShortByNotice } from './notices';
+import { SpendMiniRow } from './spendingParts';
 
 const PARTS: { key: BreakdownKey; label: string; tone: Tone }[] = [
   { key: 'bills', label: 'Bills', tone: 'bills' },
@@ -203,12 +215,21 @@ export function HomeScreen() {
         </Card>
       )}
 
-      {/* 3. Next paycheck */}
+      {/* 3. Spending money: what's left this week or month, and the everyday "Log spending" button. */}
+      {/* Without categories it's an invite to add one, which waits until the bills are in (one next step at a time). */}
+      {(data.spending.length > 0 || (hasIncome && !needsBills)) && (
+        <SpendingCard
+          onAdd={() => nav.goTab('savings', 'add-spending')}
+          onOpen={() => nav.goTab('savings')}
+        />
+      )}
+
+      {/* 4. Next paycheck */}
       {hasIncome && windows.length > 0 ? (
         <NextPaycheckCard paycheckWindow={windows[0]} onOpen={() => nav.openPage('paycheck')} />
       ) : null}
 
-      {/* 4. Debt-free date */}
+      {/* 5. Debt-free date */}
       {payoff && (
         <Card
           title="Debt-free date"
@@ -261,7 +282,7 @@ export function HomeScreen() {
         </Card>
       )}
 
-      {/* 5. Smart Plan */}
+      {/* 6. Smart Plan */}
       {hasIncome && (
         <Card
           className={`plan-card${!plan.feasible || plan.goalsShortfall > 0 ? ' plan-card--short' : plan.hasSuggestions ? ' plan-card--new' : ''}`}
@@ -342,7 +363,7 @@ export function HomeScreen() {
         </Card>
       )}
 
-      {/* 6. Savings goals */}
+      {/* 7. Savings goals */}
       {goalRows.length > 0 && (
         <Card title="Savings goals" action={{ label: 'See all savings', onClick: () => nav.goTab('savings') }}>
           <ul className="home-goals" role="list">
@@ -375,13 +396,57 @@ export function HomeScreen() {
         </Card>
       )}
 
-      {/* 7. Net worth & credit score */}
+      {/* 8. Net worth & credit score */}
       <NetWorthCard onOpen={() => nav.openPage('networth')} />
 
       {!hasIncome && (
         <p className="footnote">Tip: start with Money In, then add your bills. The big number fills in as you go.</p>
       )}
     </div>
+  );
+}
+
+/**
+ * What's left of each spending category this week or month ("Fun Money · $13 left this week") with a "Log spending"
+ * button. Without any spending categories it invites adding one first.
+ */
+function SpendingCard({ onAdd, onOpen }: { onAdd: () => void; onOpen: () => void }) {
+  const { data } = useBudget();
+  const today = useToday();
+  const [logging, setLogging] = useState(false);
+  const rows = useMemo(
+    () => data.spending.map((c) => ({ c, spend: categorySpend(c, data.spendLog, today) })),
+    [data.spending, data.spendLog, today],
+  );
+
+  if (rows.length === 0) {
+    return (
+      <Card title="Spending money" className="home-spend" data-testid="home-spending">
+        <p className="muted small">
+          Log what you spend and see what's left each week or month. Add a spending category first, like Fun Money.
+        </p>
+        <button type="button" className="btn btn--secondary btn--block home-spend__btn" onClick={onAdd}>
+          <IconPlus size={18} /> Add spending money
+        </button>
+      </Card>
+    );
+  }
+  return (
+    <Card title="Spending money" className="home-spend" data-testid="home-spending">
+      <ul className="home-spend__list" role="list">
+        {rows.map(({ c, spend }) => (
+          <SpendMiniRow key={c.id} category={c} spend={spend} />
+        ))}
+      </ul>
+      <button type="button" className="btn btn--primary btn--block home-spend__btn" onClick={() => setLogging(true)}>
+        <IconPlus size={20} /> Log spending
+      </button>
+      <button type="button" className="card__action" onClick={onOpen}>
+        <span>See your spending money</span>
+        <IconChevronRight size={18} />
+      </button>
+      {logging && <LogSpendingSheet onClose={() => setLogging(false)} />}
+    </Card>
   );
 }
 

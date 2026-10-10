@@ -2,7 +2,7 @@ import { useLayoutEffect } from 'react';
 import type { ThemeSetting } from '../types';
 
 /** Fallback status-bar colors (match --bg in src/styles/tokens.css and the theme-color tags in index.html). */
-const FALLBACK_BG = { light: '#f2f2f7', dark: '#000000' } as const;
+const FALLBACK_BG = { light: '#fff5f8', dark: '#150a10' } as const;
 
 function themeColorMetas(): HTMLMetaElement[] {
   return Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'));

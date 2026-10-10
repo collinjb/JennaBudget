@@ -280,7 +280,7 @@ ol {
 }
 
 .btn--secondary {
-  background: var(--c-bills-soft);
+  background: var(--accent-soft);
   color: var(--link);
 }
 

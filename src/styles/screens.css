@@ -514,6 +514,283 @@
   align-items: flex-start;
 }
 
+/* ---------- Spending log ---------- */
+
+/* This week's / month's status: "This week: $13 left of $25" (or a warning line when over) and a small bar. */
+.spend-status__text {
+  font-size: var(--fs-subhead);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.spend-status__text strong {
+  font-weight: 800;
+}
+
+.spend-status--over .spend-status__text {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--c-warn-ink);
+  font-weight: 600;
+}
+
+.spend-status--over .spend-status__text svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.spend-status--over .spend-status__text > span {
+  min-width: 0;
+}
+
+/* Savings & Fun rows: the whole row opens the details (its button is stretched over the row); "Log" sits on top. */
+.spend-item__tap {
+  min-height: 0;
+  padding-bottom: 6px;
+}
+
+.spend-item__tap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.spend-item__tap:active {
+  background: none;
+}
+
+.spend-item:has(.spend-item__tap:active) {
+  background: var(--fill);
+}
+
+.spend-item__status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 0 16px 12px 68px; /* lines up with the name, next to the 40px icon */
+}
+
+/* Status line on its own row; the bar and the Log button share the next one. */
+.spend-item__status .spend-status {
+  display: contents;
+}
+
+.spend-item__status .spend-status__text {
+  grid-column: 1 / -1;
+}
+
+.spend-item__log {
+  position: relative;
+  z-index: 2;
+}
+
+/* Large text: use the full width under the icon too. */
+@container (max-width: 15em) {
+  .spend-item__status {
+    padding-left: 16px;
+  }
+}
+
+/* Details sheet */
+.spend-detail__intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.spend-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.spend-box .spend-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.spend-box .spend-status__text {
+  font-size: var(--fs-callout);
+}
+
+.spend-box .progress {
+  background: var(--fill-strong);
+}
+
+.spend-box__meta {
+  color: var(--text-2);
+  font-size: var(--fs-footnote);
+  line-height: 1.4;
+}
+
+.spend-entries__title {
+  margin: 0 2px 8px;
+  font-size: var(--fs-headline);
+  font-weight: 700;
+}
+
+.spend-entries__list {
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.spend-entries__list > li + li {
+  border-top: 1px solid var(--separator);
+}
+
+.spend-entries__list :focus-visible {
+  outline-offset: -3px;
+}
+
+.spend-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px 8px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.spend-entry:active {
+  background: var(--fill);
+}
+
+.spend-entry__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.spend-entry__what {
+  font-size: var(--fs-callout);
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.spend-entry__day {
+  color: var(--text-2);
+  font-size: var(--fs-footnote);
+}
+
+.spend-entry__amt {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+@container (max-width: 15em) {
+  .spend-entry {
+    flex-wrap: wrap;
+  }
+  .spend-entry__main {
+    flex-basis: 100%;
+  }
+  .spend-entry__amt {
+    margin-left: auto;
+  }
+}
+
+.spend-detail__note {
+  margin-top: -4px;
+  line-height: 1.4;
+}
+
+/* Log sheet */
+.log-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.log-preview {
+  padding: 0 2px;
+  color: var(--text-2);
+  font-size: var(--fs-subhead);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.log-preview strong {
+  color: var(--text);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.log-preview .log-preview__over {
+  color: var(--c-warn-ink);
+}
+
+.field__optional {
+  color: var(--text-2);
+  font-weight: 400;
+}
+
+/* Home: spending money at a glance */
+.home-spend__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home-spend__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.home-spend__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 10px;
+}
+
+.home-spend__name {
+  min-width: 0;
+  font-size: var(--fs-callout);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.home-spend__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: var(--fs-subhead);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.home-spend__left svg {
+  flex: 0 0 auto;
+}
+
+.home-spend__left--over {
+  color: var(--c-warn-ink);
+}
+
+.home-spend__btn {
+  margin-top: 16px;
+}
+
 /* ---------- Debt ---------- */
 
 .debt-summary__date {
@@ -1126,8 +1403,8 @@ p.debt-month--done svg {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--c-bills-soft);
-  color: var(--c-bills-ink);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
   font-weight: 800;
   font-size: var(--fs-footnote);
 }
@@ -1501,7 +1778,7 @@ p.debt-month--done svg {
   height: 72px;
   margin-bottom: 10px;
   border-radius: 16px;
-  box-shadow: 0 10px 26px rgba(46, 168, 224, 0.3);
+  box-shadow: 0 10px 26px rgba(230, 73, 128, 0.35);
 }
 
 .lock__title {

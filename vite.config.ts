@@ -18,7 +18,7 @@ const APP_VERSION = (JSON.parse(readFileSync(new URL('./package.json', import.me
   .version;
 
 // App background colors. Keep in sync with --bg in src/styles/tokens.css, index.html and scripts/generate-icons.mjs.
-const LIGHT_BG = '#f2f2f7';
+const LIGHT_BG = '#fff5f8';
 
 export default defineConfig({
   base,

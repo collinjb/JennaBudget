@@ -11,21 +11,25 @@ import { Money } from '../components/Money';
 import { MoneyInput, useMoneyField } from '../components/MoneyInput';
 import { PageHeader } from '../components/PageHeader';
 import { ProgressBar } from '../components/ProgressBar';
-import { SegmentedControl } from '../components/Select';
 import { addMonthsClamped, compareISO, formatMonth, monthKey } from '../lib/dates';
 import { projectGoal, type GoalProjection } from '../lib/goals';
 import { newId } from '../lib/ids';
 import { formatMoney } from '../lib/money';
-import { GOAL_PRESETS, SPENDING_PRESETS } from '../lib/presets';
+import { GOAL_PRESETS } from '../lib/presets';
+import { categorySpend, periodBudget, type CategorySpend } from '../lib/spending';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import type { Goal, ISODate, SpendingCategory } from '../types';
 import { GoalMonthLine, GoalStatusLine } from './goalStatus';
+import { LogSpendingSheet } from './LogSpendingSheet';
 import { useNav } from './nav';
 import { useDeleteWithUndo } from './shared';
+import { SpendingSheet } from './SpendingSheet';
+import { periodWord, SpendStatus } from './spendingParts';
 
 type SheetState =
   | { kind: 'spending'; item: SpendingCategory | null }
+  | { kind: 'log'; categoryId: string | null }
   | { kind: 'goal'; item: Goal | null }
   | { kind: 'add-money'; item: Goal };
 
@@ -45,6 +49,11 @@ export function SavingsScreen() {
   const spending = data.spending;
   const goals = data.goals;
   const spendingTotal = useMemo(() => spending.reduce((a, s) => a + s.monthly, 0), [spending]);
+  // This week's or month's spending for each category (what's left after the purchases logged so far).
+  const spends = useMemo(
+    () => new Map(spending.map((s) => [s.id, categorySpend(s, data.spendLog, today)])),
+    [spending, data.spendLog, today],
+  );
   const projections = useMemo(() => new Map(goals.map((g) => [g.id, projectGoal(g, today)])), [goals, today]);
   // What the goals set aside this month (automatic amounts for goals with a date): the same number Home uses.
   const savingTotal = useMemo(
@@ -76,30 +85,22 @@ export function SavingsScreen() {
         />
       ) : (
         <>
+          <button
+            type="button"
+            className="btn btn--primary btn--block"
+            onClick={() => setSheet({ kind: 'log', categoryId: null })}
+          >
+            <IconPlus size={20} /> Log spending
+          </button>
           <ul className="list" role="list">
             {spending.map((s) => (
-              <li key={s.id}>
-                <button type="button" className="row" onClick={() => setSheet({ kind: 'spending', item: s })}>
-                  <span className="row__icon" aria-hidden="true">
-                    {s.emoji}
-                  </span>
-                  <span className="row__main">
-                    <span className="row__title">{s.name}</span>
-                    <span className="row__sub">
-                      <span className={`badge ${s.kind === 'need' ? 'badge--need' : 'badge--fun'}`}>
-                        {s.kind === 'need' ? 'Must-have' : 'Nice-to-have'}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="row__end">
-                    <span className="row__amount">
-                      <Money cents={s.monthly} />
-                    </span>
-                    <span className="row__amount-sub">a month</span>
-                  </span>
-                  <IconChevronRight size={18} className="row__chev" />
-                </button>
-              </li>
+              <SpendingRow
+                key={s.id}
+                category={s}
+                spend={spends.get(s.id) ?? categorySpend(s, data.spendLog, today)}
+                onOpen={() => setSheet({ kind: 'spending', item: s })}
+                onLog={() => setSheet({ kind: 'log', categoryId: s.id })}
+              />
             ))}
           </ul>
           <button
@@ -211,6 +212,7 @@ export function SavingsScreen() {
       )}
 
       {sheet?.kind === 'spending' && <SpendingSheet item={sheet.item} onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'log' && <LogSpendingSheet categoryId={sheet.categoryId} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'goal' && <GoalSheet item={sheet.item} today={today} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'add-money' && (
         <AddMoneySheet
@@ -237,80 +239,60 @@ export function SavingsScreen() {
   );
 }
 
-function formatShortTarget(d: ISODate): string {
-  return formatMonth(monthKey(d), 'short');
+/**
+ * One spending category: the row opens its details (the whole row is tappable), and shows this week's or month's
+ * status with a small bar and a "Log" shortcut that starts the log sheet on this category.
+ */
+function SpendingRow({
+  category: s,
+  spend,
+  onOpen,
+  onLog,
+}: {
+  category: SpendingCategory;
+  spend: CategorySpend;
+  onOpen: () => void;
+  onLog: () => void;
+}) {
+  return (
+    <li className="spend-item">
+      <button type="button" className="row spend-item__tap" onClick={onOpen}>
+        <span className="row__icon" aria-hidden="true">
+          {s.emoji}
+        </span>
+        <span className="row__main">
+          <span className="row__title">{s.name}</span>
+          <span className="row__sub">
+            <span className={`badge ${s.kind === 'need' ? 'badge--need' : 'badge--fun'}`}>
+              {s.kind === 'need' ? 'Must-have' : 'Nice-to-have'}
+            </span>
+          </span>
+        </span>
+        <span className="row__end">
+          <span className="row__amount">
+            <Money cents={periodBudget(s)} />
+          </span>
+          <span className="row__amount-sub">a {periodWord(s.period)}</span>
+        </span>
+        <IconChevronRight size={18} className="row__chev" />
+      </button>
+      <div className="spend-item__status">
+        <SpendStatus name={s.name} period={s.period} spend={spend} testId={`spend-status-${s.id}`} />
+        <button
+          type="button"
+          className="btn btn--secondary btn--sm spend-item__log"
+          aria-label={`Log spending for ${s.name}`}
+          onClick={onLog}
+        >
+          <IconPlus size={16} /> Log
+        </button>
+      </div>
+    </li>
+  );
 }
 
-export function SpendingSheet({ item, onClose }: { item: SpendingCategory | null; onClose: () => void }) {
-  const { actions } = useBudget();
-  const del = useDeleteWithUndo();
-  const [name, setName] = useState(item?.name ?? '');
-  const [emoji, setEmoji] = useState(item?.emoji ?? '🛒');
-  const [kind, setKind] = useState<SpendingCategory['kind']>(item?.kind ?? 'need');
-  const monthly = useMoneyField(item?.monthly ?? null, { required: true });
-
-  const save = () => {
-    const cents = monthly.validate();
-    if (cents === null) return false;
-    actions.upsert('spending', {
-      id: item?.id ?? newId(),
-      name: cleanName(name, kind === 'fun' ? 'Fun Money' : 'Spending'),
-      emoji,
-      monthly: cents,
-      kind,
-      period: item?.period ?? 'month',
-    });
-    return true;
-  };
-
-  return (
-    <BottomSheet
-      title={item ? 'Edit spending' : 'Add spending money'}
-      onClose={onClose}
-      onSave={save}
-      bigSaveLabel={item ? 'Save changes' : 'Add spending money'}
-      onDelete={item ? () => del('spending', item.id, item.name) : undefined}
-      deleteLabel="Delete this"
-      testId="spending-sheet"
-    >
-      {!item && (
-        <ChipRow title="Quick pick (tap one to fill in)">
-          {SPENDING_PRESETS.map((p) => (
-            <Chip
-              key={p.name}
-              emoji={p.emoji}
-              label={p.name}
-              selected={name === p.name}
-              onClick={() => {
-                setName(p.name);
-                setEmoji(p.emoji);
-                setKind(p.kind);
-              }}
-            />
-          ))}
-        </ChipRow>
-      )}
-      <div className="name-row name-row--wrap">
-        <EmojiPicker value={emoji} onChange={setEmoji} label="icon" />
-        <TextField label="Name" value={name} onChange={setName} placeholder="Like Groceries" />
-      </div>
-      <MoneyInput label="How much each month?" {...monthly.props} big />
-      <SegmentedControl
-        label="Is this a must-have?"
-        value={kind}
-        onChange={setKind}
-        options={[
-          { value: 'need', label: 'Must-have' },
-          { value: 'fun', label: 'Nice-to-have' },
-        ]}
-        helper={
-          kind === 'need'
-            ? 'Things you need, like groceries and gas. The Smart Plan never changes these.'
-            : 'Extras, like eating out or fun money. The Smart Plan may suggest a different amount.'
-        }
-      />
-    </BottomSheet>
-  );
+function formatShortTarget(d: ISODate): string {
+  return formatMonth(monthKey(d), 'short');
 }
 
 export function GoalSheet({ item, today, onClose }: { item: Goal | null; today: ISODate; onClose: () => void }) {

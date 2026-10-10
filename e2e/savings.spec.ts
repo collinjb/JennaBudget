@@ -41,8 +41,9 @@ test.describe('Savings & Fun: spending money', () => {
     await expect(page.getByRole('button', { name: /^Gas Must-have \$120/ })).toBeVisible();
     await expect(page.getByText('$520 a month', { exact: true })).toBeVisible();
 
-    // Edit: rename, change amount and make it a nice-to-have.
+    // Edit (the row opens its details; Edit turns them into the form): rename, change amount, make it a nice-to-have.
     await page.getByRole('button', { name: /^Gas/ }).click();
+    await sheet(page, 'spending-detail-sheet').getByRole('button', { name: 'Edit Gas' }).click();
     s = sheet(page, 'spending-sheet');
     await expect(s.getByRole('heading', { name: 'Edit spending' })).toBeVisible();
     await s.getByLabel('Name').fill('Road trips');
@@ -55,6 +56,7 @@ test.describe('Savings & Fun: spending money', () => {
 
     // Delete + Undo.
     await page.getByRole('button', { name: /^Road trips/ }).click();
+    await sheet(page, 'spending-detail-sheet').getByRole('button', { name: 'Edit Road trips' }).click();
     await sheet(page, 'spending-sheet').getByRole('button', { name: 'Delete this' }).click();
     await dialog(page).getByRole('button', { name: 'Delete' }).click();
     await expect(page.getByRole('button', { name: /^Road trips/ })).toHaveCount(0);

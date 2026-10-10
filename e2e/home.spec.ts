@@ -71,6 +71,7 @@ test.describe('Home', () => {
     // More spending money: Spending +$60.
     await goTab(page, 'Savings & Fun');
     await page.getByRole('button', { name: /^Groceries/ }).click();
+    await sheet(page, 'spending-detail-sheet').getByRole('button', { name: 'Edit Groceries' }).click();
     const sp = sheet(page, 'spending-sheet');
     await sp.getByLabel('How much each month?').fill('360');
     await sp.getByRole('button', { name: 'Save changes' }).click();
