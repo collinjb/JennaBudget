@@ -24,8 +24,8 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
   7-day storage cleanup.
 
 - **Minimum iOS: 16.4 or later** (the build's browser target; the app also uses `dvh` units, `color-mix()` and `inert`).
-- Always link to the address **with the trailing slash** (`/JennaBudget/`); without it the page is outside the offline
-  service worker's scope.
+- **Hosting: Vercel** (https://jenna-budget.vercel.app/), served from the site root, deployed automatically from `main`.
+  GitHub Actions only runs the checks. (The build still supports a sub-path via `BASE_PATH` if hosting ever moves.)
 - Text scales with browser zoom and the layout is checked at 125–200%. iPhone's "Larger Text" setting
   (`-apple-system-body`) isn't wired in yet; that's a future option once the layout is proven at those sizes on a real phone.
 

@@ -3,11 +3,11 @@
 A super simple budget app for iPhone. Add your paychecks, bills, debt, savings goals, and fun money, and it shows you
 how much is left over, when you'll be debt-free, and a Smart Plan for splitting your money.
 
-**Live app:** https://collinjb.github.io/JennaBudget/
+**Live app:** https://jenna-budget.vercel.app/
 
 ## Install it on your iPhone
 
-1. Open **https://collinjb.github.io/JennaBudget/** in **Safari**.
+1. Open **https://jenna-budget.vercel.app/** in **Safari**.
 2. Tap the **Share** button (the square with an arrow pointing up).
 3. Scroll down and tap **Add to Home Screen**.
 4. Tap **Add**.
@@ -51,16 +51,16 @@ npm run lint         # code checks
 npm run build        # production build into dist/
 ```
 
-**Publishing:** every push to `main` on GitHub automatically checks, builds, and publishes the app to GitHub Pages
-(`.github/workflows/deploy.yml`). One-time setup in the repo: Settings → Pages → Source: **GitHub Actions**.
-Installed copies pick up the new version automatically.
+**Publishing:** the app is hosted on **Vercel**, which builds and publishes every push to `main` automatically.
+GitHub also runs the checks (lint, unit tests, build) on every push (`.github/workflows/checks.yml`).
+Installed copies pick up the new version automatically ("A new version is ready · Refresh").
 
-**Never change the web address** (repo name, `BASE_PATH`, or host) after installing. The iPhone ties the app and its
+**Never change the web address** (the Vercel domain) after installing. The iPhone ties the app and its
 data to the address. If it ever has to change, back up first and restore in the new app.
 
-Other scripts: `npm run icons` regenerates the app icon and launch screens from `scripts/icon.svg`;
+Other scripts: `npm run icons` regenerates the app icon and launch screens from `scripts/icon-source.webp`;
 `npm run qr -- <url>` writes `docs/qr.png`. Smoke-test the live site with
-`BASE_URL=https://collinjb.github.io/JennaBudget/ npx playwright test`.
+`BASE_URL=https://jenna-budget.vercel.app/ E2E_ACCESS_CODE=<code> npx playwright test`.
 
 ## How it's built
 
