@@ -195,6 +195,8 @@ export interface PaycheckWindow {
   payday: PayDay;
   /** Exclusive end = the following payday's date. */
   end: ISODate;
+  /** The following payday (which incomes pay then), or null when there's only one income date known. */
+  nextPayday: PayDay | null;
   items: PlanItem[];
   total: Cents;
   /** payday.amount - total (may be negative). */
@@ -210,6 +212,8 @@ export interface PaycheckWindow {
   holdForLater: Cents;
   /** The later bills that money is for (unpaid items of the short window(s) it covers). */
   holdFor: PlanItem[];
+  /** The later payday that can't cover those bills on its own (the nearest short one), or null. */
+  holdForPayday: PayDay | null;
   /** What's safe to move to savings or spend from this paycheck: paycheck − due − holdForLater (never negative). */
   safeToSave: Cents;
   /** For a short window: the earlier payday that keeps money for it, or null if it has to come from money on hand. */
@@ -307,6 +311,7 @@ export function paycheckPlanDetailed(data: BudgetData, today: ISODate, count = 4
     windows.push({
       payday,
       end,
+      nextPayday: paydays[i + 1] ?? null,
       items,
       total,
       left: payday.amount - total,
@@ -314,6 +319,7 @@ export function paycheckPlanDetailed(data: BudgetData, today: ISODate, count = 4
       due,
       holdForLater: 0,
       holdFor: [],
+      holdForPayday: null,
       safeToSave: 0,
       coveredBy: null,
     });
@@ -330,6 +336,7 @@ export function paycheckPlanDetailed(data: BudgetData, today: ISODate, count = 4
       w.safeToSave = available - carry;
       if (carry > 0) {
         w.holdFor = pending.flatMap((j) => windows[j].items.filter((it) => !it.paid));
+        w.holdForPayday = windows[pending[0]]?.payday ?? null;
         for (const j of pending) windows[j].coveredBy = w.payday.date;
       }
       carry = 0;
@@ -340,6 +347,7 @@ export function paycheckPlanDetailed(data: BudgetData, today: ISODate, count = 4
       if (spare > 0 && carry > 0) {
         w.holdForLater = spare;
         w.holdFor = pending.flatMap((j) => windows[j].items.filter((it) => !it.paid));
+        w.holdForPayday = windows[pending[0]]?.payday ?? null;
         for (const j of pending) windows[j].coveredBy = w.payday.date;
       }
       w.safeToSave = 0;

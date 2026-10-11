@@ -9,7 +9,7 @@ import { paycheckPlanDetailed } from '../lib/schedule';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import { useNav } from './nav';
-import { itemsText, SafeToSave, ShortByNotice } from './notices';
+import { itemsText, paydayLabel, paydayNames, SafeToSave, ShortByNotice } from './notices';
 import { extraPaycheckHeadsUp } from './shared';
 
 export function PaycheckPlanPage() {
@@ -73,6 +73,9 @@ export function PaycheckPlanPage() {
                     </div>
                     <Money cents={w.payday.amount} className="window-card__amt" />
                   </div>
+                  {w.payday.sources.length === 1 && (
+                    <p className="muted small window-card__sources">{paydayNames(w.payday)}</p>
+                  )}
                   {w.payday.sources.length > 1 && (
                     <p className="muted small window-card__sources">
                       {w.payday.sources.map((s, i) => (
@@ -86,8 +89,11 @@ export function PaycheckPlanPage() {
                   )}
 
                   <h3 className="window-card__sub">
-                    Due before {formatDate(w.end, 'short')}
-                    <span className="sr-only"> (the next payday)</span>
+                    {w.nextPayday ? (
+                      <>Due before your next payday, {paydayLabel(w.nextPayday)}</>
+                    ) : (
+                      <>Due before {formatDate(w.end, 'short')}</>
+                    )}
                   </h3>
                   {w.items.length === 0 ? (
                     <p className="muted small">Nothing is due. This whole paycheck is free for savings and spending.</p>

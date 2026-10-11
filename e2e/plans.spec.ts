@@ -209,7 +209,7 @@ test.describe('Paycheck Plan', () => {
     const next = page.getByTestId('next-paycheck');
     await expect(next).toContainText('Fri, Oct 9');
     await expect(next).toContainText('$1,120');
-    await expect(next).toContainText('Due before the next payday (Oct 23):');
+    await expect(next).toContainText('Due before your next payday, Fri, Oct 23 (Paycheck + Side gig):');
     await expect(next).toContainText('Rent');
     // No earlier paycheck to cover it, so it comes from money on hand, and nothing is safe to move to savings.
     await expect(next).toContainText('⚠️ This paycheck is short by $80. Keep $80 from money you already have.');
@@ -227,7 +227,7 @@ test.describe('Paycheck Plan', () => {
 
     await expect(w(0).getByRole('heading', { name: 'Fri, Oct 9' })).toBeVisible();
     await expect(w(0)).toContainText('Paycheck $1,000 + Side gig $120');
-    await expect(w(0)).toContainText('Due before Oct 23');
+    await expect(w(0)).toContainText('Due before your next payday, Fri, Oct 23 (Paycheck + Side gig)');
     await expect(w(0)).toContainText('Oct 15');
     await expect(w(0)).toContainText('Rent');
     await expect(w(0)).toContainText('Total due$1,200');
@@ -258,7 +258,7 @@ test.describe('Paycheck Plan', () => {
     await openApp(page, budget({ incomes: [income({ payDate: '2026-10-08' })], bills: [bill({ dueDay: 20 })] }));
     const next = page.getByTestId('next-paycheck');
     await expect(next).toContainText('Thu, Oct 8');
-    await expect(next).toContainText('Due before the next payday (Nov 8):');
+    await expect(next).toContainText('Due before your next payday, Sun, Nov 8 (Paycheck):');
     await expect(next).toContainText('$1,200 left');
   });
 

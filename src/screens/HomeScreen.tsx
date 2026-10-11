@@ -31,7 +31,15 @@ import { GoalMonthLine, GoalStatusLine } from './goalStatus';
 import { LogSpendingSheet } from './LogSpendingSheet';
 import { useNav } from './nav';
 import { BandBadge, signedMoney } from './netWorthParts';
-import { GOALS_SHORT_TITLE, GoalsShortText, InterestWarningNotice, SafeToSave, ShortByNotice } from './notices';
+import {
+  GOALS_SHORT_TITLE,
+  GoalsShortText,
+  InterestWarningNotice,
+  paydayLabel,
+  paydayNames,
+  SafeToSave,
+  ShortByNotice,
+} from './notices';
 import { SpendMiniRow } from './spendingParts';
 
 const PARTS: { key: BreakdownKey; label: string; tone: Tone }[] = [
@@ -517,9 +525,13 @@ function NextPaycheckCard({ paycheckWindow: w, onOpen }: { paycheckWindow: Paych
         <span className="muted"> · </span>
         <Money cents={w.payday.amount} className="payday-card__amt" />
       </p>
+      <p className="muted small payday-card__who">{paydayNames(w.payday)}</p>
       {w.items.length > 0 ? (
         <>
-          <p className="muted small payday-card__due">Due before the next payday ({formatDate(w.end, 'short')}):</p>
+          <p className="muted small payday-card__due">
+            Due before your next payday
+            {w.nextPayday ? <>, {paydayLabel(w.nextPayday)}</> : <> ({formatDate(w.end, 'short')})</>}:
+          </p>
           <ul className="mini-list" role="list">
             {shown.map((it) => (
               <li key={`${it.kind}-${it.id}-${it.date}`} className="mini-list__row">
@@ -534,7 +546,9 @@ function NextPaycheckCard({ paycheckWindow: w, onOpen }: { paycheckWindow: Paych
           </ul>
         </>
       ) : (
-        <p className="muted small payday-card__due">Nothing is due before the next payday.</p>
+        <p className="muted small payday-card__due">
+          Nothing is due before your next payday{w.nextPayday ? <>, {paydayLabel(w.nextPayday)}</> : null}.
+        </p>
       )}
       {w.shortBy > 0 ? (
         <ShortByNotice shortBy={w.shortBy} coveredBy={w.coveredBy} className="payday-card__result" />

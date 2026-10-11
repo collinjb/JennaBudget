@@ -2,7 +2,7 @@ import { IconCheck, IconWarning } from '../components/Icons';
 import { Money } from '../components/Money';
 import { formatDate } from '../lib/dates';
 import type { InterestWarning } from '../lib/debt';
-import type { PaycheckWindow, PlanItem } from '../lib/schedule';
+import type { PayDay, PaycheckWindow, PlanItem } from '../lib/schedule';
 import { ceilDollars } from '../lib/money';
 import type { Cents, ISODate } from '../types';
 
@@ -32,6 +32,16 @@ export function InterestWarningNotice({ warning: w, paysOffLater }: { warning: I
       </span>
     </p>
   );
+}
+
+/** "Owens Paycheck" / "Owens Paycheck + Collin Games": which incomes pay on a payday. */
+export function paydayNames(p: PayDay): string {
+  return p.sources.map((s) => s.name).join(' + ');
+}
+
+/** "Fri, Oct 30 (Collin Games)": a payday named by date and by which paycheck it is. */
+export function paydayLabel(p: PayDay): string {
+  return `${formatDate(p.date, 'weekday')} (${paydayNames(p)})`;
 }
 
 /** "Car Loan on Nov 5" / "Car Loan on Nov 5 and Phone on Nov 6" (at most two named, then "and more"). */
@@ -88,7 +98,15 @@ export function SafeToSave({ paycheckWindow: w, className }: { paycheckWindow: P
           <strong>
             <Money cents={w.holdForLater} />
           </strong>{' '}
-          of it for {itemsText(w.holdFor)}, since your next paycheck can't cover it.
+          of it for {itemsText(w.holdFor)}, since{' '}
+          {w.holdForPayday ? (
+            <>
+              your {formatDate(w.holdForPayday.date, 'weekday')} payday ({paydayNames(w.holdForPayday)},{' '}
+              <Money cents={w.holdForPayday.amount} />) can't cover it.
+            </>
+          ) : (
+            <>your next paycheck can't cover it.</>
+          )}
         </p>
       )}
       <p className="safe-to-save__amount">
