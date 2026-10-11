@@ -40,6 +40,7 @@ import {
   SafeToSave,
   ShortByNotice,
 } from './notices';
+import { RightNowCard } from './RightNowCard';
 import { SpendMiniRow } from './spendingParts';
 
 const PARTS: { key: BreakdownKey; label: string; tone: Tone }[] = [
@@ -178,6 +179,9 @@ export function HomeScreen() {
           </button>
         </Card>
       )}
+
+      {/* Right now: money in checking and what's safe to use today. */}
+      {hasIncome && <RightNowCard />}
 
       {/* 2. Where your money goes */}
       {hasIncome && (

@@ -1942,3 +1942,57 @@ p.debt-month--done svg {
 .safe-to-save__amount strong {
   color: var(--accent-ink);
 }
+
+/* ---------- Right now (checking) ---------- */
+
+.right-now__checking {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.right-now__label {
+  grid-column: 1;
+  margin: 0;
+  font-size: var(--fs-subhead);
+  color: var(--text-2);
+}
+
+.right-now__amount {
+  grid-column: 1;
+  margin: 2px 0 0;
+  font-size: var(--fs-title);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.right-now__update {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.right-now__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 0;
+  font-size: var(--fs-subhead);
+  color: var(--text-2);
+}
+
+.right-now__line-amt {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.right-now .safe-to-save__amount,
+.right-now .notice {
+  margin-top: 12px;
+}
+
+.right-now__stale {
+  margin: 8px 0 0;
+}

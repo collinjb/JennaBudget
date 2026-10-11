@@ -91,6 +91,11 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
   A Home figure can differ by $1 from the same total shown with cents on another screen; that's rounding, not a bug.
 
 ## Budget semantics
+- **"Right now" uses the checking balance** (owner's request) from the checking account(s) on the Net worth page,
+  updated by hand ("Update" on Home). Safe to save or spend now = checking − unpaid bills due before the next payday −
+  anything the upcoming paychecks can't cover on their own. The monthly Left Over stays the plan; this is today's cash.
+  It doesn't adjust itself when bills are paid or money is spent: it shows "as of" the update date and asks for a fresh
+  balance when it's not from today.
 - **Safe to save, per paycheck** (owner's feedback: car payment on the 5th, paychecks after the 5th). The monthly
   budget can be fine while the timing isn't: part of this month's pay has to cover next month's early bills. The
   Paycheck Plan walks back from later paychecks: when one can't cover the bills before the next payday, an earlier

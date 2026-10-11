@@ -368,10 +368,21 @@ const TYPE_SELECT: Option<AccountType>[] = TYPE_ORDER.map((t) => ({
   label: t === 'retirement' ? `${ACCOUNT_TYPE_INFO[t].short} (like SERS)` : ACCOUNT_TYPE_INFO[t].label,
 }));
 
-function AccountSheet({ account, today, onClose }: { account: Account | null; today: ISODate; onClose: () => void }) {
+export function AccountSheet({
+  account,
+  today,
+  onClose,
+  defaultType = 'savings',
+}: {
+  account: Account | null;
+  today: ISODate;
+  onClose: () => void;
+  /** Type preselected for a new account (e.g. 'checking' from Home's "Right now" card). */
+  defaultType?: AccountType;
+}) {
   const { actions } = useBudget();
   const del = useDeleteWithUndo();
-  const [type, setType] = useState<AccountType>(account?.type ?? 'savings');
+  const [type, setType] = useState<AccountType>(account?.type ?? defaultType);
   const [name, setName] = useState(account?.name ?? '');
   const balance = useMoneyField(account?.balance ?? null, { required: true });
 
@@ -417,7 +428,7 @@ function AccountSheet({ account, today, onClose }: { account: Account | null; to
 }
 
 /** "Update balance": just the new balance (marks it updated today, even when it's the same). */
-function AccountBalanceSheet({ account, today, onClose }: { account: Account; today: ISODate; onClose: () => void }) {
+export function AccountBalanceSheet({ account, today, onClose }: { account: Account; today: ISODate; onClose: () => void }) {
   const { actions } = useBudget();
   const balance = useMoneyField(account.balance, { required: true });
   const save = () => {
