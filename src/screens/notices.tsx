@@ -1,8 +1,10 @@
-import { IconWarning } from '../components/Icons';
+import { IconCheck, IconWarning } from '../components/Icons';
 import { Money } from '../components/Money';
+import { formatDate } from '../lib/dates';
 import type { InterestWarning } from '../lib/debt';
+import type { PaycheckWindow, PlanItem } from '../lib/schedule';
 import { ceilDollars } from '../lib/money';
-import type { Cents } from '../types';
+import type { Cents, ISODate } from '../types';
 
 /**
  * "This debt never gets paid off on its own", worded for the actual cause (Home and Debt).
@@ -32,19 +34,73 @@ export function InterestWarningNotice({ warning: w, paysOffLater }: { warning: I
   );
 }
 
-/** "⚠️ This paycheck is short by $210. Set aside $210 from the paycheck before." (Home and Paycheck Plan) */
-export function ShortByNotice({ shortBy, className }: { shortBy: Cents; className?: string }) {
+/** "Car Loan on Nov 5" / "Car Loan on Nov 5 and Phone on Nov 6" (at most two named, then "and more"). */
+export function itemsText(items: PlanItem[]): string {
+  const named = items.slice(0, 2).map((it) => `${it.name} on ${formatDate(it.date, 'short')}`);
+  if (items.length > 2) named.push('more');
+  return named.join(named.length > 2 ? ', ' : ' and ').replace(', more', ', and more');
+}
+
+/**
+ * "⚠️ This paycheck is short by $100. It's covered by $100 kept from your Fri, Oct 23 paycheck." — or, when no earlier
+ * paycheck covers it, "Keep $100 from money you already have." (Home and Paycheck Plan)
+ */
+export function ShortByNotice({
+  shortBy,
+  coveredBy,
+  className,
+}: {
+  shortBy: Cents;
+  coveredBy?: ISODate | null;
+  className?: string;
+}) {
   return (
-    <p className={['notice notice--over', className].filter(Boolean).join(' ')}>
+    <p className={['notice', coveredBy ? 'notice--info' : 'notice--over', className].filter(Boolean).join(' ')}>
       <span>
-        <span aria-hidden="true">⚠️ </span>
+        <span aria-hidden="true">{coveredBy ? 'ℹ️ ' : '⚠️ '}</span>
         This paycheck is short by{' '}
         <strong>
           <Money cents={shortBy} />
         </strong>
-        . Set aside <Money cents={shortBy} /> from the paycheck before.
+        .{' '}
+        {coveredBy ? (
+          <>It's covered by money kept from your {formatDate(coveredBy, 'weekday')} paycheck.</>
+        ) : (
+          <>
+            Keep <Money cents={shortBy} /> from money you already have.
+          </>
+        )}
       </span>
     </p>
+  );
+}
+
+/**
+ * What's safe to move to savings or spend from a paycheck, after the bills before the next payday and any money kept
+ * for a later bill the next paycheck can't cover (like a car payment on the 5th). (Home and Paycheck Plan)
+ */
+export function SafeToSave({ paycheckWindow: w, className }: { paycheckWindow: PaycheckWindow; className?: string }) {
+  return (
+    <div className={['safe-to-save', className].filter(Boolean).join(' ')} data-testid="safe-to-save">
+      {w.holdForLater > 0 && (
+        <p className="safe-to-save__keep">
+          Keep{' '}
+          <strong>
+            <Money cents={w.holdForLater} />
+          </strong>{' '}
+          of it for {itemsText(w.holdFor)}, since your next paycheck can't cover it.
+        </p>
+      )}
+      <p className="safe-to-save__amount">
+        <IconCheck size={16} />
+        <span>
+          Safe to save or spend:{' '}
+          <strong>
+            <Money cents={w.safeToSave} />
+          </strong>
+        </span>
+      </p>
+    </div>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   itemsDueBetween,
   nextPaydays,
   paycheckPlan,
+  paycheckPlanDetailed,
   semimonthlyDaysError,
 } from './schedule';
 import { bill, budget, debt, income } from './testUtils';
@@ -383,5 +384,61 @@ describe('Paycheck Plan and logged debt payments', () => {
     // Next month: the paid-off debt is gone and the other is due again.
     const next = itemsDueBetween(data, nov, '2026-12-01');
     expect(next.map((i) => [i.id, i.paid])).toEqual([['a', false]]);
+  });
+});
+
+describe('Paycheck Plan: safe to save, and money kept for bills before the next paycheck', () => {
+  // Every-2-weeks paycheck on Fridays (Oct 23, Nov 6, ...), a $400 side job on the 30th, and a $500 car payment on
+  // the 5th — which falls between the Oct 30 and Nov 6 paydays.
+  const data = budget({
+    incomes: [
+      income({ id: 'main', name: 'Main', amount: 136_500, frequency: 'biweekly', payDate: '2026-10-23' }),
+      income({ id: 'side', name: 'Side', amount: 40_000, frequency: 'monthly', payDate: '2026-10-30' }),
+    ],
+    bills: [bill({ id: 'phone', name: 'Phone', amount: 6_500, dueDay: 25 })],
+    debts: [debt({ id: 'car', name: 'Car Loan', balance: 1_000_000, minPayment: 50_000, dueDay: 5 })],
+  });
+
+  it('keeps money from an earlier paycheck when a later one can’t cover the car payment', () => {
+    const { windows } = paycheckPlanDetailed(data, '2026-10-11', 4);
+    const [oct23, oct30] = windows;
+    expect(oct23.payday.date).toBe('2026-10-23');
+    expect(oct30.payday.date).toBe('2026-10-30');
+    // Oct 30's $400 can't cover the $500 car payment on Nov 5 → short $100, kept from Oct 23.
+    expect(oct30.items.map((i) => i.name)).toEqual(['Car Loan']);
+    expect(oct30.shortBy).toBe(10_000);
+    expect(oct30.coveredBy).toBe('2026-10-23');
+    expect(oct30.safeToSave).toBe(0);
+    // Oct 23: $1,365 − Phone $65 − $100 kept for the car = $1,200 safe.
+    expect(oct23.due).toBe(6_500);
+    expect(oct23.holdForLater).toBe(10_000);
+    expect(oct23.holdFor.map((i) => i.name)).toEqual(['Car Loan']);
+    expect(oct23.safeToSave).toBe(136_500 - 6_500 - 10_000);
+  });
+
+  it('safe to save never goes negative, and what no paycheck can cover comes from money on hand', () => {
+    const tight = budget({
+      incomes: [income({ amount: 40_000, frequency: 'monthly', payDate: '2026-10-30' })],
+      debts: [debt({ name: 'Car Loan', balance: 1_000_000, minPayment: 50_000, dueDay: 5 })],
+    });
+    const plan = paycheckPlanDetailed(tight, '2026-10-11', 2);
+    expect(plan.windows.every((w) => w.safeToSave === 0)).toBe(true);
+    expect(plan.windows[0].coveredBy).toBeNull();
+    expect(plan.needFromNow).toBeGreaterThan(0);
+  });
+
+  it('bills due before the next payday are counted as money needed now', () => {
+    const plan = paycheckPlanDetailed(data, '2026-10-20', 2); // phone is due Oct 25; next payday Oct 23
+    expect(plan.beforeNextPayday).toEqual([]);
+    const early = paycheckPlanDetailed(data, '2026-10-02', 2); // car payment Oct 5 comes before the Oct 9 payday
+    expect(early.beforeNextPayday.map((i) => i.name)).toEqual(['Car Loan']);
+    expect(early.needFromNow).toBeGreaterThanOrEqual(50_000);
+  });
+
+  it('a bill already marked paid needs nothing from the paycheck', () => {
+    const paid = { ...data, bills: [{ ...data.bills[0], paidMonth: '2026-10' }] };
+    const { windows } = paycheckPlanDetailed(paid, '2026-10-11', 1);
+    expect(windows[0].due).toBe(0);
+    expect(windows[0].safeToSave).toBe(136_500 - 10_000);
   });
 });

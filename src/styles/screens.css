@@ -1902,3 +1902,43 @@ p.debt-month--done svg {
     padding-top: 24px;
   }
 }
+
+/* ---------- Safe to save (per paycheck) ---------- */
+
+.safe-to-save {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.safe-to-save__keep {
+  margin: 0;
+  font-size: var(--fs-subhead);
+  color: var(--text-2);
+}
+
+.safe-to-save__keep strong {
+  color: var(--text);
+}
+
+.safe-to-save__amount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: var(--fs-callout);
+}
+
+.safe-to-save__amount svg {
+  flex: 0 0 auto;
+  color: var(--accent-ink);
+}
+
+.safe-to-save__amount strong {
+  color: var(--accent-ink);
+}

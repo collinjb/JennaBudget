@@ -211,7 +211,9 @@ test.describe('Paycheck Plan', () => {
     await expect(next).toContainText('$1,120');
     await expect(next).toContainText('Due before the next payday (Oct 23):');
     await expect(next).toContainText('Rent');
-    await expect(next).toContainText('⚠️ This paycheck is short by $80. Set aside $80 from the paycheck before.');
+    // No earlier paycheck to cover it, so it comes from money on hand, and nothing is safe to move to savings.
+    await expect(next).toContainText('⚠️ This paycheck is short by $80. Keep $80 from money you already have.');
+    await expect(next.getByTestId('safe-to-save')).toContainText('Safe to save or spend: $0');
   });
 
   test('four paydays, each with its items, totals and short-by warning', async ({ page }) => {
@@ -230,18 +232,23 @@ test.describe('Paycheck Plan', () => {
     await expect(w(0)).toContainText('Rent');
     await expect(w(0)).toContainText('Total due$1,200');
     await expect(w(0)).toContainText('Left from this paycheck-$80');
-    await expect(w(0)).toContainText('⚠️ This paycheck is short by $80. Set aside $80 from the paycheck before.');
+    await expect(w(0)).toContainText('⚠️ This paycheck is short by $80. Keep $80 from money you already have.');
+    await expect(page.getByTestId('need-from-now')).toContainText('keep $80 from money you already have');
 
     await expect(w(1).getByRole('heading', { name: 'Fri, Oct 23' })).toBeVisible();
     await expect(w(1)).toContainText('Phone');
     await expect(w(1)).toContainText('Left from this paycheck$1,060');
     await expect(w(1)).not.toContainText('short by');
+    // Nov 6's paycheck can't cover Nov 15's rent, so Oct 23 keeps $80 for it and only $980 is safe to save.
+    await expect(w(1)).toContainText('Keep $80 of it for Rent on Nov 15');
+    await expect(w(1).getByTestId('safe-to-save')).toContainText('Safe to save or spend: $980');
 
     await expect(w(2).getByRole('heading', { name: 'Fri, Nov 6' })).toBeVisible();
     await expect(w(2)).toContainText('short by $80');
+    await expect(w(2)).toContainText("It's covered by money kept from your Fri, Oct 23 paycheck.");
     await expect(w(3).getByRole('heading', { name: 'Fri, Nov 20' })).toBeVisible();
     await expect(w(3)).toContainText('Phone');
-    await expect(page.getByText("Savings and fun money come out of what's left.")).toBeVisible();
+    await expect(page.getByText('Move savings and fun money from each paycheck', { exact: false })).toBeVisible();
 
     await page.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'October' })).toBeVisible();

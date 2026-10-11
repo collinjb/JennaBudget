@@ -91,6 +91,12 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
   A Home figure can differ by $1 from the same total shown with cents on another screen; that's rounding, not a bug.
 
 ## Budget semantics
+- **Safe to save, per paycheck** (owner's feedback: car payment on the 5th, paychecks after the 5th). The monthly
+  budget can be fine while the timing isn't: part of this month's pay has to cover next month's early bills. The
+  Paycheck Plan walks back from later paychecks: when one can't cover the bills before the next payday, an earlier
+  paycheck keeps money for it ("Keep $100 of it for Car Loan on Nov 5"), and each paycheck shows "Safe to save or
+  spend". What no upcoming paycheck can cover (plus unpaid bills before the next payday) is shown as money to keep from
+  what you already have. Bills already marked paid need nothing from the paycheck.
 - **Paychecks count as a usual month** (owner's feedback): every 2 weeks = 2 paychecks, weekly = 4, twice a month = 2.
   Budgeting on the yearly average (×26÷12) made Left Over look ~8% bigger than it really is in a normal 2-paycheck month.
   The 3rd (or 5th) paycheck months are a bonus, called out in Money In. Bills still use the true yearly average

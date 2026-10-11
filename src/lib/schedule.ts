@@ -201,7 +201,34 @@ export interface PaycheckWindow {
   left: Cents;
   /** max(0, total - payday.amount). */
   shortBy: Cents;
+  /** Bills and payments in this window not yet marked paid (what this paycheck really has to cover). */
+  due: Cents;
+  /**
+   * Money from this paycheck to keep for a LATER window whose own paycheck can't cover it (e.g. a car payment on the
+   * 5th when the next paycheck comes on the 6th).
+   */
+  holdForLater: Cents;
+  /** The later bills that money is for (unpaid items of the short window(s) it covers). */
+  holdFor: PlanItem[];
+  /** What's safe to move to savings or spend from this paycheck: paycheck − due − holdForLater (never negative). */
+  safeToSave: Cents;
+  /** For a short window: the earlier payday that keeps money for it, or null if it has to come from money on hand. */
+  coveredBy: ISODate | null;
 }
+
+export interface PaycheckPlan {
+  windows: PaycheckWindow[];
+  /**
+   * Money you need from what you already have (not from upcoming paychecks): unpaid bills due before the next payday,
+   * plus any shortfall the upcoming paychecks can't cover. 0 when the paychecks cover everything.
+   */
+  needFromNow: Cents;
+  /** Unpaid bills due from today until the next payday (part of needFromNow). */
+  beforeNextPayday: PlanItem[];
+}
+
+/** Later paydays looked at so an early paycheck knows to hold money for a short later one. */
+const LOOKAHEAD_WINDOWS = 3;
 
 /** Bill occurrences + debt minimum payments due in [start, end), sorted by date then name. */
 export function itemsDueBetween(data: BudgetData, start: ISODate, end: ISODate): PlanItem[] {
@@ -253,14 +280,30 @@ export function itemsDueBetween(data: BudgetData, start: ISODate, end: ISODate):
  * Returns [] when there are no incomes.
  */
 export function paycheckPlan(data: BudgetData, today: ISODate, count = 4): PaycheckWindow[] {
-  if (count <= 0) return [];
-  const paydays = nextPaydays(data.incomes, today, count + 1);
+  return paycheckPlanDetailed(data, today, count).windows;
+}
+
+/**
+ * The next `count` paychecks with what each must cover, plus cash-flow safety: walking back from later paychecks,
+ * a paycheck that can't cover the bills before the one after it gets covered by money kept from an earlier
+ * paycheck (`holdForLater`), and `safeToSave` is what's left after that. Whatever the upcoming paychecks can't
+ * cover (and unpaid bills due before the next payday) is `needFromNow`.
+ */
+export function paycheckPlanDetailed(data: BudgetData, today: ISODate, count = 4): PaycheckPlan {
+  const beforeEnd = data.incomes.length > 0 ? nextPaydays(data.incomes, today, 1)[0]?.date : undefined;
+  const beforeNextPayday = beforeEnd ? itemsDueBetween(data, today, beforeEnd).filter((it) => !it.paid) : [];
+  const beforeTotal = beforeNextPayday.reduce((s, it) => s + it.amount, 0);
+  if (count <= 0) return { windows: [], needFromNow: beforeTotal, beforeNextPayday };
+
+  const all = count + LOOKAHEAD_WINDOWS;
+  const paydays = nextPaydays(data.incomes, today, all + 1);
   const windows: PaycheckWindow[] = [];
-  for (let i = 0; i < Math.min(count, paydays.length); i++) {
+  for (let i = 0; i < Math.min(all, paydays.length); i++) {
     const payday = paydays[i];
     const end = paydays[i + 1]?.date ?? addMonthsClamped(payday.date, 1);
     const items = itemsDueBetween(data, payday.date, end);
     const total = items.reduce((s, it) => s + it.amount, 0);
+    const due = items.filter((it) => !it.paid).reduce((s, it) => s + it.amount, 0);
     windows.push({
       payday,
       end,
@@ -268,9 +311,46 @@ export function paycheckPlan(data: BudgetData, today: ISODate, count = 4): Paych
       total,
       left: payday.amount - total,
       shortBy: Math.max(0, total - payday.amount),
+      due,
+      holdForLater: 0,
+      holdFor: [],
+      safeToSave: 0,
+      coveredBy: null,
     });
   }
-  return windows;
+
+  // Walk back from the last paycheck: money a later paycheck is short is kept from the ones before it.
+  let carry = 0;
+  let pending: number[] = []; // windows whose shortfall is being carried back
+  for (let i = windows.length - 1; i >= 0; i--) {
+    const w = windows[i];
+    const available = w.payday.amount - w.due;
+    if (available >= carry) {
+      w.holdForLater = carry;
+      w.safeToSave = available - carry;
+      if (carry > 0) {
+        w.holdFor = pending.flatMap((j) => windows[j].items.filter((it) => !it.paid));
+        for (const j of pending) windows[j].coveredBy = w.payday.date;
+      }
+      carry = 0;
+      pending = [];
+    } else {
+      // This paycheck can't cover it all: whatever it can spare goes toward the later shortfall, the rest carries on.
+      const spare = Math.max(0, available);
+      if (spare > 0 && carry > 0) {
+        w.holdForLater = spare;
+        w.holdFor = pending.flatMap((j) => windows[j].items.filter((it) => !it.paid));
+        for (const j of pending) windows[j].coveredBy = w.payday.date;
+      }
+      w.safeToSave = 0;
+      carry = carry - available;
+      if (available < 0) pending = [i, ...pending];
+    }
+  }
+  // A short window covered only partly by earlier paychecks still needs money on hand.
+  if (carry > 0) for (const j of pending) windows[j].coveredBy = null;
+
+  return { windows: windows.slice(0, count), needFromNow: beforeTotal + carry, beforeNextPayday };
 }
 
 /**

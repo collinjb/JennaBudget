@@ -123,6 +123,12 @@ export function SavingsScreen() {
         )}
       </div>
       <p className="section-note">Things you're saving up for, like a trip or a safety net.</p>
+      {goals.length > 0 && savingTotal > 0 && (
+        <p className="section-note" data-testid="savings-timing-tip">
+          Move it a little from each paycheck: Home shows how much is <strong>safe to save</strong> from your next one,
+          so bills due before the paycheck after it (like a car payment early in the month) stay covered.
+        </p>
+      )}
       {goals.length === 0 ? (
         <EmptyState
           compact

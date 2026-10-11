@@ -20,7 +20,7 @@ import { debtsThisMonth, interestWarnings } from '../lib/debt';
 import { projectGoal } from '../lib/goals';
 import { ceilDollars, formatMoney } from '../lib/money';
 import { netWorth, scoreSummary } from '../lib/networth';
-import { paycheckPlan, type PaycheckWindow } from '../lib/schedule';
+import { paycheckPlanDetailed, type PaycheckWindow } from '../lib/schedule';
 import { buildSmartPlan } from '../lib/smartPlan';
 import { categorySpend } from '../lib/spending';
 import { homeBreakdown, monthlySummary, type BreakdownKey } from '../lib/summary';
@@ -31,7 +31,7 @@ import { GoalMonthLine, GoalStatusLine } from './goalStatus';
 import { LogSpendingSheet } from './LogSpendingSheet';
 import { useNav } from './nav';
 import { BandBadge, signedMoney } from './netWorthParts';
-import { GOALS_SHORT_TITLE, GoalsShortText, InterestWarningNotice, ShortByNotice } from './notices';
+import { GOALS_SHORT_TITLE, GoalsShortText, InterestWarningNotice, SafeToSave, ShortByNotice } from './notices';
 import { SpendMiniRow } from './spendingParts';
 
 const PARTS: { key: BreakdownKey; label: string; tone: Tone }[] = [
@@ -51,7 +51,7 @@ export function HomeScreen() {
 
   const summary = useMemo(() => monthlySummary(data, today), [data, today]);
   const hb = useMemo(() => homeBreakdown(summary), [summary]);
-  const windows = useMemo(() => paycheckPlan(data, today, 1), [data, today]);
+  const windows = useMemo(() => paycheckPlanDetailed(data, today, 1).windows, [data, today]);
   const plan = useMemo(() => buildSmartPlan(data, today), [data, today]);
   const activeDebts = useMemo(() => data.debts.filter((d) => d.balance > 0), [data.debts]);
   // The Smart Plan already simulated the payoff at the current pace ("before"); reuse it instead of running it again.
@@ -537,15 +537,16 @@ function NextPaycheckCard({ paycheckWindow: w, onOpen }: { paycheckWindow: Paych
         <p className="muted small payday-card__due">Nothing is due before the next payday.</p>
       )}
       {w.shortBy > 0 ? (
-        <ShortByNotice shortBy={w.shortBy} className="payday-card__result" />
+        <ShortByNotice shortBy={w.shortBy} coveredBy={w.coveredBy} className="payday-card__result" />
       ) : (
         <p className="payday-card__left">
           <strong className="tone-left">
             <Money cents={w.left} /> left
           </strong>{' '}
-          from this paycheck.
+          from this paycheck after these.
         </p>
       )}
+      <SafeToSave paycheckWindow={w} />
     </Card>
   );
 }

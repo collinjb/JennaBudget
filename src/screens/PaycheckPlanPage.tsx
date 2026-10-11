@@ -5,11 +5,11 @@ import { IconInfo } from '../components/Icons';
 import { Money } from '../components/Money';
 import { PageHeader } from '../components/PageHeader';
 import { formatDate, monthKey } from '../lib/dates';
-import { paycheckPlan } from '../lib/schedule';
+import { paycheckPlanDetailed } from '../lib/schedule';
 import { useBudget } from '../state/store';
 import { useToday } from '../state/useToday';
 import { useNav } from './nav';
-import { ShortByNotice } from './notices';
+import { itemsText, SafeToSave, ShortByNotice } from './notices';
 import { extraPaycheckHeadsUp } from './shared';
 
 export function PaycheckPlanPage() {
@@ -17,7 +17,8 @@ export function PaycheckPlanPage() {
   const today = useToday();
   const nav = useNav();
   const month = monthKey(today);
-  const windows = useMemo(() => paycheckPlan(data, today, 4), [data, today]);
+  const plan = useMemo(() => paycheckPlanDetailed(data, today, 4), [data, today]);
+  const windows = plan.windows;
 
   const headsUp = useMemo(() => extraPaycheckHeadsUp(data.incomes, month), [data.incomes, month]);
 
@@ -38,6 +39,20 @@ export function PaycheckPlanPage() {
         />
       ) : (
         <>
+          {plan.needFromNow > 0 && (
+            <p className="notice notice--warn" data-testid="need-from-now">
+              <span>
+                <span aria-hidden="true">⚠️ </span>
+                Before your next paycheck, keep{' '}
+                <strong>
+                  <Money cents={plan.needFromNow} />
+                </strong>{' '}
+                from money you already have
+                {plan.beforeNextPayday.length > 0 ? <> for {itemsText(plan.beforeNextPayday)}</> : null}.
+              </span>
+            </p>
+          )}
+
           {headsUp && (
             <p className="notice notice--info">
               <IconInfo size={18} />
@@ -118,13 +133,16 @@ export function PaycheckPlanPage() {
                       Bills you've already paid still count here, since this paycheck is what pays them.
                     </p>
                   )}
-                  {w.shortBy > 0 && <ShortByNotice shortBy={w.shortBy} />}
+                  {w.shortBy > 0 && <ShortByNotice shortBy={w.shortBy} coveredBy={w.coveredBy} />}
+                  <SafeToSave paycheckWindow={w} className="window-card__safe" />
                 </Card>
               </li>
             ))}
           </ol>
           <p className="footnote">
-            Only bills and minimum debt payments are listed. Savings and fun money come out of what's left.
+            Only bills and minimum debt payments are listed. Move savings and fun money from each paycheck's "Safe to
+            save or spend" amount, so bills due before the next paycheck (like a car payment early in the month) are
+            always covered.
           </p>
         </>
       )}
