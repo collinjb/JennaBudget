@@ -91,6 +91,10 @@ Choices made while building, so they're easy to revisit. Newest at the bottom of
   A Home figure can differ by $1 from the same total shown with cents on another screen; that's rounding, not a bug.
 
 ## Budget semantics
+- **Paychecks count as a usual month** (owner's feedback): every 2 weeks = 2 paychecks, weekly = 4, twice a month = 2.
+  Budgeting on the yearly average (×26÷12) made Left Over look ~8% bigger than it really is in a normal 2-paycheck month.
+  The 3rd (or 5th) paycheck months are a bonus, called out in Money In. Bills still use the true yearly average
+  (weekly ×52÷12, every 2 weeks ×26÷12), so costs are never underestimated.
 - "Paid this month" is stored as the month it was ticked (`paidMonth`), so it resets automatically on the 1st.
 - Bills not due in the current month (quarterly/yearly) say "Not due this month" and don't count toward "X of Y paid".
 - Debt minimums count as `min(minimum, balance)`; planned extra only counts while some debt remains.

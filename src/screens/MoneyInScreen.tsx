@@ -12,7 +12,7 @@ import { MoneyInput, useMoneyField } from '../components/MoneyInput';
 import { PageHeader } from '../components/PageHeader';
 import { Select } from '../components/Select';
 import { formatDate, monthKey } from '../lib/dates';
-import { ALL_FREQUENCIES, factorText, FREQUENCY_LABELS, incomeMonthly, isApproxMonthly } from '../lib/frequency';
+import { FREQUENCY_LABELS, INCOME_FREQUENCIES, incomeMonthly, PAYCHECKS_PER_MONTH } from '../lib/frequency';
 import { formatMoney } from '../lib/money';
 import { newId } from '../lib/ids';
 import { nextPaydays } from '../lib/schedule';
@@ -22,7 +22,7 @@ import type { Income, IncomeFrequency, ISODate } from '../types';
 import { useNav } from './nav';
 import { extraPaycheckHeadsUp, freqText, frequencyOptions, useDeleteWithUndo } from './shared';
 
-export const INCOME_FREQUENCIES: IncomeFrequency[] = ['weekly', 'biweekly', 'semimonthly', 'monthly'];
+export { INCOME_FREQUENCIES };
 export const INCOME_FREQ_OPTIONS = frequencyOptions(INCOME_FREQUENCIES);
 
 export function MoneyInScreen() {
@@ -36,7 +36,6 @@ export function MoneyInScreen() {
   const incomes = data.incomes;
 
   const total = useMemo(() => incomes.reduce((a, i) => a + incomeMonthly(i), 0), [incomes]);
-  const anyApprox = incomes.some((i) => isApproxMonthly(i.frequency));
 
   const headsUp = useMemo(() => extraPaycheckHeadsUp(incomes, month), [incomes, month]);
 
@@ -59,8 +58,8 @@ export function MoneyInScreen() {
       ) : (
         <>
           <Card className="total-card">
-            <BigNumber label="You take home about" tone="plain" size="lg" caption="a month, after taxes">
-              <Money cents={total} approx={anyApprox} testId="income-total" />
+            <BigNumber label="You take home" tone="plain" size="lg" caption="in a usual month, after taxes">
+              <Money cents={total} testId="income-total" />
             </BigNumber>
             <details className="explain">
               <summary>
@@ -68,14 +67,17 @@ export function MoneyInScreen() {
               </summary>
               <div className="explain__body">
                 <p>
-                  Months aren't exactly 4 weeks long, so we spread a whole year of paychecks evenly over 12 months.
-                  That's why some numbers have a "≈".
+                  We count the paychecks you get in a usual month. Paid every 2 weeks? Most months have 2 paydays, so
+                  that's what your budget counts on. A couple of months a year have a 3rd payday, and that one is a
+                  bonus.
                 </p>
                 <ul role="list">
-                  {ALL_FREQUENCIES.map((f) => (
+                  {INCOME_FREQUENCIES.map((f) => (
                     <li key={f}>
                       <span>{FREQUENCY_LABELS[f]}</span>
-                      <span>{factorText(f)}</span>
+                      <span>
+                        {PAYCHECKS_PER_MONTH[f] === 1 ? '1 paycheck' : `${PAYCHECKS_PER_MONTH[f]} paychecks`}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -98,12 +100,11 @@ export function MoneyInScreen() {
             {incomes.map((i) => {
               const next = nextPaydays([i], today, 1)[0];
               const monthly = incomeMonthly(i);
-              const approx = isApproxMonthly(i.frequency);
-              // Read in a sensible order: "Paycheck, $1,450 every 2 weeks, about $3,141.67 a month, next payday …".
+              // Read in a sensible order: "Paycheck, $1,450 every 2 weeks, $2,900 in a usual month, next payday …".
               const label = [
                 i.name,
                 `${formatMoney(i.amount)} ${freqText(i.frequency)}`,
-                i.frequency === 'monthly' ? null : `${approx ? 'about ' : ''}${formatMoney(monthly)} a month`,
+                i.frequency === 'monthly' ? null : `${formatMoney(monthly)} in a usual month`,
                 next ? `next payday ${formatDate(next.date, 'weekday')}` : null,
               ]
                 .filter(Boolean)
@@ -123,7 +124,7 @@ export function MoneyInScreen() {
                       <span className="row__line">
                         <span className="row__title">{i.name}</span>
                         <span className="row__amount">
-                          <Money cents={monthly} approx={approx} />
+                          <Money cents={monthly} />
                         </span>
                       </span>
                       <span className="row__line row__sub">

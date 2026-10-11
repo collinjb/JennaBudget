@@ -64,7 +64,8 @@ Need a change outside your folder? Don't make it — report it to the lead in yo
 
 All in `src/lib`. Integer cents only; round half-up once at the end of each conversion.
 
-- **Monthly equivalents** (`toMonthly`): weekly ×52÷12 · biweekly ×26÷12 · semimonthly ×2 · monthly ×1 ·
+- **Income** (`incomeMonthly`): a usual month, every 2 weeks ×2, weekly ×4, twice a month ×2, monthly ×1 (extra
+  paydays are a bonus). **Bill monthly equivalents** (`toMonthly`): weekly ×52÷12 · biweekly ×26÷12 · semimonthly ×2 · monthly ×1 ·
   quarterly ÷3 · yearly ÷12. Show "≈" for weekly/biweekly/quarterly/yearly.
 - **Monthly summary**: income − bills − (debt minimums + extra) − spending − savings = **Left Over**.
   Debt minimum counted as `min(minPayment, balance)` for debts with balance > 0. Extra only counts while any debt has a

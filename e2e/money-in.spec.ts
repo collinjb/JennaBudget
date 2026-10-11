@@ -46,7 +46,7 @@ test.describe('Money In', () => {
     await expect(s).toBeHidden();
     await expectCents(total, 250_000);
 
-    // A second, every-2-weeks paycheck: $500 × 26 ÷ 12 = $1,083.33 a month, shown with "≈".
+    // A second, every-2-weeks paycheck: 2 paychecks in a usual month = $1,000 (the 3rd-paycheck months are a bonus).
     await page.getByRole('button', { name: 'Add income' }).click();
     s = sheet(page, 'income-sheet');
     await s.getByLabel('Name').fill('Side gig');
@@ -55,8 +55,8 @@ test.describe('Money In', () => {
     await s.getByLabel('Next payday').fill('2026-10-09');
     await s.getByRole('button', { name: 'Add paycheck' }).click();
     await expect(s).toBeHidden();
-    await expectCents(total, 358_333);
-    await expect(total).toHaveText('≈ $3,583.33');
+    await expectCents(total, 350_000);
+    await expect(total).toHaveText('$3,500');
     await expect(page.getByText(/Heads up: Side gig pays 3 times in January!/)).toBeVisible();
 
     // Delete with confirmation, then Undo puts it back in the same place.
@@ -66,10 +66,10 @@ test.describe('Money In', () => {
     await dialog(page).getByRole('button', { name: 'Delete' }).click();
     await expect(page.getByRole('status')).toContainText('Deleted “Main job”');
     await expect(mainRow).toHaveCount(0);
-    await expectCents(total, 108_333);
+    await expectCents(total, 100_000);
     await undoButton(page).click();
     await expect(mainRow).toBeVisible();
-    await expectCents(total, 358_333);
+    await expectCents(total, 350_000);
     expect((await stored(page)).incomes.map((i) => i.name)).toEqual(['Main job', 'Side gig']);
   });
 
@@ -97,10 +97,10 @@ test.describe('Money In', () => {
       }),
     );
     await goTab(page, 'Money In');
-    // $1,000 × 2 + $300 × 52 ÷ 12 ($1,300) = $3,300
-    await expectCents(page.getByTestId('income-total'), 330_000);
+    // Usual month: $1,000 × 2 + $300 × 4 weekly paychecks = $3,200
+    await expectCents(page.getByTestId('income-total'), 320_000);
     await expect(page.getByRole('button', { name: /^Semi/ })).toContainText('$1,000 twice a month');
     await page.getByText('How we calculate this').click();
-    await expect(page.getByText('× 26 ÷ 12')).toBeVisible();
+    await expect(page.getByText('Most months have 2 paydays', { exact: false })).toBeVisible();
   });
 });

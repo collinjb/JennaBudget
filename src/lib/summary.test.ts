@@ -8,7 +8,7 @@ const TODAY = '2026-10-08';
 function sample() {
   return budget({
     incomes: [
-      income({ amount: 145_000, frequency: 'biweekly' }), // 314,167
+      income({ amount: 145_000, frequency: 'biweekly' }), // 290,000 (2 paychecks in a usual month)
       income({ amount: 50_000, frequency: 'semimonthly' }), // 100,000
     ],
     bills: [
@@ -38,7 +38,7 @@ function sample() {
 describe('monthlySummary', () => {
   it('adds everything up', () => {
     expect(monthlySummary(sample(), TODAY)).toEqual({
-      income: 414_167,
+      income: 390_000,
       bills: 103_158,
       debtMinimums: 7_500,
       debtExtra: 5_000,
@@ -48,7 +48,7 @@ describe('monthlySummary', () => {
       spending: 57_050,
       savings: 30_000,
       outgo: 202_708,
-      leftOver: 211_459,
+      leftOver: 187_292,
     });
   });
 
@@ -97,9 +97,9 @@ describe('homeBreakdown', () => {
     const h = homeBreakdown(s);
     expect(h.over).toBe(false);
     expect(h.parts.map((p) => p.key)).toEqual(['bills', 'debt', 'savings', 'spending', 'leftOver']);
-    expect(h.parts.map((p) => p.cents)).toEqual([103_200, 12_500, 30_000, 57_000, 211_500]);
-    expect(h.income).toBe(414_200);
-    expect(h.leftOver).toBe(211_500);
+    expect(h.parts.map((p) => p.cents)).toEqual([103_200, 12_500, 30_000, 57_000, 187_300]);
+    expect(h.income).toBe(390_000);
+    expect(h.leftOver).toBe(187_300);
     expect(h.parts.reduce((t, p) => t + p.cents, 0)).toBe(h.income);
   });
 

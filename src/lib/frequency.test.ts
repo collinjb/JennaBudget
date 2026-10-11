@@ -78,8 +78,11 @@ describe('incomeMonthly / billMonthly', () => {
       payDate: '2026-10-09',
       semimonthlyDays: [1, 15],
     };
-    expect(incomeMonthly(income)).toBe(314_167);
+    // Paychecks count as a usual month: every 2 weeks = 2, weekly = 4 (the extra paydays are a bonus).
+    expect(incomeMonthly(income)).toBe(290_000);
+    expect(incomeMonthly({ ...income, frequency: 'weekly' })).toBe(580_000);
     expect(incomeMonthly({ ...income, frequency: 'semimonthly' })).toBe(290_000);
+    expect(incomeMonthly({ ...income, frequency: 'monthly' })).toBe(145_000);
     const bill: Bill = {
       id: 'b',
       name: 'Prime',

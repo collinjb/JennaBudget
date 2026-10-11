@@ -58,8 +58,24 @@ export function toMonthly(amount: Cents, freq: AnyFrequency): Cents {
 export function isApproxMonthly(freq: AnyFrequency): boolean {
   return freq !== 'monthly' && freq !== 'semimonthly';
 }
+/**
+ * Paychecks count the way most months actually go: every 2 weeks = 2 paychecks a month, weekly = 4. The few extra
+ * paychecks a year (months with a 3rd or 5th payday) aren't counted on; they're a bonus (see extraPaycheckMonths).
+ * Bills, on the other hand, use MONTHLY_FACTORS (the true yearly average), so costs are never underestimated.
+ */
+export const PAYCHECKS_PER_MONTH: Record<IncomeFrequency, number> = {
+  weekly: 4,
+  biweekly: 2,
+  semimonthly: 2,
+  monthly: 1,
+};
+
+/** Income frequencies in the order the explainer lists them. */
+export const INCOME_FREQUENCIES: IncomeFrequency[] = ['weekly', 'biweekly', 'semimonthly', 'monthly'];
+
+/** What a paycheck adds up to in a usual month (an exact amount, no "≈"). */
 export function incomeMonthly(i: Income): Cents {
-  return toMonthly(i.amount, i.frequency);
+  return i.amount * PAYCHECKS_PER_MONTH[i.frequency];
 }
 export function billMonthly(b: Bill): Cents {
   return toMonthly(b.amount, b.frequency);

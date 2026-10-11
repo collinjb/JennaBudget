@@ -126,7 +126,8 @@ test.describe('Home', () => {
     await s.getByRole('button', { name: 'Add paycheck' }).click();
     await expect(s).toBeHidden();
     await goTab(page, 'Home');
-    await expect(page.getByTestId('left-over')).toHaveText(/\$2,167/);
+    // $1,000 every 2 weeks counts as 2 paychecks in a usual month.
+    await expect(page.getByTestId('left-over')).toHaveText(/\$2,000/);
     await expect(page.getByRole('heading', { name: 'Next: add your bills' })).toBeVisible();
     await page.getByRole('button', { name: 'Add your bills' }).click();
     await expect(sheet(page, 'bill-sheet')).toBeVisible();
